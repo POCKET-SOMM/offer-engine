@@ -1,7 +1,7 @@
 {
   "author": "Tomas Bedej <thombedej@gmail.com>",
   "name": "@pocket-somm/offer-engine",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Agnostic calculation engine for offers",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     }
   },
   "files": [
@@ -25,6 +25,7 @@
     "lint": "tsc --noEmit"
   },
   "devDependencies": {
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }
