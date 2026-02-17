@@ -1,13 +1,20 @@
 {
   "author": "Tomas Bedej <thombedej@gmail.com>",
   "name": "@pocket-somm/offer-engine",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Agnostic calculation engine for offers",
   "private": true,
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "files": [
     "dist"
   ],
