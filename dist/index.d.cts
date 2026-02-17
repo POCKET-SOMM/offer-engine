@@ -7,6 +7,7 @@ interface ItemConfig {
     vatRate?: number;
     tags?: string[];
     id?: string;
+    gross?: number;
     data?: Record<string, any>;
 }
 interface OfferTotals {
@@ -25,6 +26,7 @@ declare class OfferItem {
     readonly vatRate: number;
     readonly tags: string[];
     readonly data: Record<string, any>;
+    private readonly _isExplicitGross;
     readonly pricePerBottle: number;
     readonly pricePerUnit: number;
     readonly gross: number;
@@ -36,6 +38,7 @@ declare class OfferItem {
     update(fields: Partial<ItemConfig>): OfferItem;
     updateCustomerPrice(target: number): OfferItem;
     updatePricePerBottle(target: number): OfferItem;
+    updateGross(target: number): OfferItem;
     toConfig(): ItemConfig;
     toJSON(): {
         pricePerBottle: number;

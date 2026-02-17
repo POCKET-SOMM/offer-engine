@@ -7,6 +7,7 @@ export interface ItemConfig {
     vatRate?: number;
     tags?: string[];
     id?: string;
+    gross?: number;
     data?: Record<string, any>;
 }
 

@@ -69,6 +69,28 @@ describe('OfferItem', () => {
             expect(updated.discount).toBe(10);
         });
 
+        it('should handle reverse gross calculation correctly', () => {
+            const item = new OfferItem({
+                price: 41.75,
+                margin: 70,
+                vatRate: 25.5,
+                quantity: 1
+            });
+
+            // gross should be 97.42, vat should be 35.49, customer price should be 174.66
+            expect(item.gross).toBe(97.42);
+            expect(item.vatAmount).toBe(35.49);
+            expect(item.customerPrice).toBe(174.66);
+
+            // update gross to 100
+            const updated = item.updateGross(100);
+            expect(updated.gross).toBe(100);
+            // vat should be 36.15
+            expect(updated.vatAmount).toBe(36.15);
+            // customer price should be 177.90
+            expect(updated.customerPrice).toBe(177.90);
+        });
+
         it('should handle margin correctly', () => {
             // Margin formula: price / (1 - margin/100)
             const item = new OfferItem({

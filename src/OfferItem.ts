@@ -13,6 +13,8 @@ export class OfferItem {
     public readonly tags: string[];
     public readonly data: Record<string, any>;
 
+    private readonly _isExplicitGross: boolean;
+
     // Calculated fields
     public readonly pricePerBottle: number;
     public readonly pricePerUnit: number;
@@ -32,8 +34,10 @@ export class OfferItem {
         this.tags = config.tags || [];
         this.data = config.data || {};
 
+        this._isExplicitGross = config.gross !== undefined;
+
         // Run calculations
-        const results = this._calculate();
+        const results = this._calculate(config.gross);
         this.pricePerBottle = results.pricePerBottle;
         this.pricePerUnit = results.pricePerUnit;
         this.gross = results.gross;
@@ -44,14 +48,23 @@ export class OfferItem {
         Object.freeze(this); // Ensure immutability
     }
 
-    private _calculate(): CalculatedTotals {
+    private _calculate(overrideGross?: number): CalculatedTotals {
         const pBottle = round(this.price * (1 - this.discount / 100));
         const multiplier = UNIT_MULTIPLIERS[this.unit.toUpperCase()] || 1;
         const pUnit = round(pBottle * multiplier);
-        const marginMultiplier = 1 - this.margin / 100;
 
-        // Handle edge case where margin is 100%
-        const grossVal = marginMultiplier === 0 ? 0 : round(pBottle / marginMultiplier - pBottle);
+        let grossVal: number;
+
+        if (overrideGross !== undefined) {
+            grossVal = overrideGross;
+            // We don't update this.margin here as it's readonly, 
+            // but effectively the margin is derived from this gross.
+            // The constructor/update logic handles the margin update separately or implicitly.
+        } else {
+            const marginMultiplier = 1 - this.margin / 100;
+            // Handle edge case where margin is 100%
+            grossVal = marginMultiplier === 0 ? 0 : round(pBottle / marginMultiplier - pBottle);
+        }
 
         const priceBeforeVat = pBottle + grossVal;
         const vAmount = round(priceBeforeVat * (this.vatRate / 100));
@@ -72,7 +85,15 @@ export class OfferItem {
     // --- Immutable Update Patterns ---
 
     update(fields: Partial<ItemConfig>): OfferItem {
-        return new OfferItem({ ...this.toConfig(), ...fields });
+        const config = this.toConfig();
+
+        // If we are updating margin explicitly, we must drop any existing exact gross 
+        // to allow the new margin to take precedence (effectively reverting to margin-based mode).
+        if (fields.margin !== undefined && fields.gross === undefined) {
+            delete config.gross;
+        }
+
+        return new OfferItem({ ...config, ...fields });
     }
 
     // Example of your "Reverse Calculation" logic
@@ -88,8 +109,21 @@ export class OfferItem {
         return this.update({ discount: newDiscount });
     }
 
+    updateGross(target: number): OfferItem {
+        const priceBeforeVat = this.pricePerBottle + target;
+        const newMargin = round((target / priceBeforeVat) * 100);
+
+        // We update margin for consistency, but we ALSO pass the exact gross 
+        // via the config so the next constructor uses it directly.
+        return new OfferItem({
+            ...this.toConfig(),
+            margin: newMargin,
+            gross: target
+        });
+    }
+
     toConfig(): ItemConfig {
-        return {
+        const config: ItemConfig = {
             id: this.id,
             price: this.price,
             discount: this.discount,
@@ -100,6 +134,12 @@ export class OfferItem {
             tags: [...this.tags],
             data: { ...this.data }
         };
+
+        if (this._isExplicitGross) {
+            config.gross = this.gross;
+        }
+
+        return config;
     }
     toJSON() {
         return {
