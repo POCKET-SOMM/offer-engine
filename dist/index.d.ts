@@ -35,6 +35,7 @@ declare class OfferItem {
     private _calculate;
     update(fields: Partial<ItemConfig>): OfferItem;
     updateCustomerPrice(target: number): OfferItem;
+    updatePricePerBottle(target: number): OfferItem;
     toConfig(): ItemConfig;
     toJSON(): {
         pricePerBottle: number;
