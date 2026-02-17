@@ -46,7 +46,7 @@ export class OfferItem {
 
     private _calculate(): CalculatedTotals {
         const pBottle = round(this.price * (1 - this.discount / 100));
-        const multiplier = UNIT_MULTIPLIERS[this.unit] || 1;
+        const multiplier = UNIT_MULTIPLIERS[this.unit.toUpperCase()] || 1;
         const pUnit = round(pBottle * multiplier);
         const marginMultiplier = 1 - this.margin / 100;
 

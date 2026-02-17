@@ -1,7 +1,7 @@
 {
   "author": "Tomas Bedej <thombedej@gmail.com>",
   "name": "@pocket-somm/offer-engine",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Agnostic calculation engine for offers",
   "private": true,
   "type": "module",
@@ -16,5 +16,9 @@
     "build": "tsup src/index.ts --format cjs,esm --dts --minify",
     "test": "vitest run",
     "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }
