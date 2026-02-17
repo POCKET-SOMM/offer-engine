@@ -1,7 +1,7 @@
 {
   "author": "Tomas Bedej <thombedej@gmail.com>",
   "name": "@pocket-somm/offer-engine",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Agnostic calculation engine for offers",
   "private": true,
   "type": "module",
