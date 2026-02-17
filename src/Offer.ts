@@ -112,12 +112,39 @@ export class Offer {
     /**
      * Bulk update field across multiple items
      */
-    bulkUpdateField(ids: string[], field: keyof ItemConfig, value: any): Offer {
+    bulkUpdateField(ids: string[] | undefined, field: keyof ItemConfig, value: any): Offer {
         const newItems = this.items.map(item => {
-            if (!ids.includes(item.id)) return item;
+            if (ids && !ids.includes(item.id)) return item;
             return item.update({ [field]: value });
         });
         return new Offer({ ...this, items: newItems });
+    }
+
+    setMargin(value: number, ids?: string[]): Offer {
+        return this.bulkUpdateField(ids, 'margin', value);
+    }
+
+    setGross(value: number, ids?: string[]): Offer {
+        return this.bulkUpdateField(ids, 'gross', value);
+    }
+
+    setDiscount(value: number, ids?: string[]): Offer {
+        return this.bulkUpdateField(ids, 'discount', value);
+    }
+
+    setQuantity(value: number, ids?: string[]): Offer {
+        return this.bulkUpdateField(ids, 'quantity', value);
+    }
+
+    setVatRate(value: number, ids?: string[]): Offer {
+        return this.bulkUpdateField(ids, 'vatRate', value);
+    }
+
+    setUnit(unit: string, ids?: string[]): Offer {
+        if (!UNIT_MULTIPLIERS[unit.toUpperCase()]) {
+            return this;
+        }
+        return this.bulkUpdateField(ids, 'unit', unit);
     }
 
     /**

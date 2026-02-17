@@ -8,6 +8,8 @@ export interface ItemConfig {
     tags?: string[];
     id?: string;
     gross?: number;
+    customerPrice?: number;
+    pricePerBottle?: number;
     data?: Record<string, any>;
 }
 

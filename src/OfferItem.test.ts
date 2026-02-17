@@ -64,7 +64,7 @@ describe('OfferItem', () => {
             });
 
             // set price per bottle to 90
-            const updated = item.updatePricePerBottle(90);
+            const updated = item.update({ pricePerBottle: 90 });
             expect(updated.pricePerBottle).toBe(90);
             expect(updated.discount).toBe(10);
         });
@@ -83,7 +83,7 @@ describe('OfferItem', () => {
             expect(item.customerPrice).toBe(174.66);
 
             // update gross to 100
-            const updated = item.updateGross(100);
+            const updated = item.update({ gross: 100 });
             expect(updated.gross).toBe(100);
             // vat should be 36.15
             expect(updated.vatAmount).toBe(36.15);
@@ -154,25 +154,96 @@ describe('OfferItem', () => {
             // Gross needed = 100. 
             // Margin = (100 / 200) * 100 = 50%
 
-            const updated = item.updateCustomerPrice(200);
+            const updated = item.update({ customerPrice: 200 });
 
             expect(updated.customerPrice).toBe(200);
+            // Margin = (100 / 200) * 100 = 50%
+            // Note: margin is rounded in results if derived, but we verify the exact target is kept
             expect(updated.margin).toBe(50);
             expect(item.margin).toBe(0); // Original untouched
         });
     });
 
-    describe('Serialization', () => {
-        it('toConfig should return clean config', () => {
-            const config = {
+    describe('Priority Hierarchy & Drift Prevention', () => {
+        it('should prioritize customerPrice over gross and margin', () => {
+            const item = new OfferItem({
                 price: 100,
-                id: 'test-id'
-            };
-            const item = new OfferItem(config);
-            const exported = item.toConfig();
+                margin: 10,
+                customerPrice: 200, // This should win
+                vatRate: 0
+            });
 
-            expect(exported.price).toBe(100);
-            expect(exported.id).toBe('test-id');
+            expect(item.customerPrice).toBe(200);
+            expect(item.gross).toBe(100);
+        });
+
+        it('should prioritize gross over margin', () => {
+            const item = new OfferItem({
+                price: 100,
+                margin: 10,
+                gross: 50, // This should win
+                vatRate: 0
+            });
+
+            expect(item.gross).toBe(50);
+            expect(item.customerPrice).toBe(150);
+        });
+
+        it('should prevent drift after multiple updates and re-serializations', () => {
+            // Set an exact customer price that doesn't align with a 2-decimal margin
+            // Custom target: 146.37 (from previous example)
+            // If we deriving from 70% margin, it's 146.37.
+            // Let's pick a value that drifts normally:
+            // Price: 41.75
+            // Target Gross: 100
+            // Margin = (100 / (41.75 + 100)) * 100 = 70.54673... -> rounds to 70.55
+            // If we use 70.55 margin: 41.75 / (1 - 0.7055) - 41.75 = 100.016... -> 100.02
+
+            let item = new OfferItem({
+                price: 41.75,
+                gross: 100,
+                vatRate: 25.5
+            });
+
+            expect(item.gross).toBe(100);
+
+            // Re-create from config (serialization simulation)
+            item = new OfferItem(item.toConfig());
+            expect(item.gross).toBe(100);
+
+            // Update something unrelated
+            item = item.update({ quantity: 10 });
+            expect(item.gross).toBe(100); // Should still be exactly 100
+        });
+
+        it('should clear higher-priority locks when lower-priority fields are updated', () => {
+            const item = new OfferItem({
+                price: 100,
+                customerPrice: 200,
+                vatRate: 0
+            });
+
+            expect(item.customerPrice).toBe(200);
+
+            // Now update margin (lower priority than customerPrice)
+            // It should clear the customerPrice lock and recalculate from margin.
+            const updated = item.update({ margin: 75 });
+
+            // Cost 100, Margin 75% -> Sale Price = 100 / (1 - 0.75) = 400
+            expect(updated.customerPrice).toBe(400);
+        });
+    });
+
+    describe('Serialization', () => {
+        it('toConfig should return accurate explicit fields', () => {
+            const item = new OfferItem({
+                price: 100,
+                customerPrice: 200
+            });
+            const config = item.toConfig();
+
+            expect(config.customerPrice).toBe(200);
+            expect(config.margin).toBeDefined();
         });
 
         it('toJSON should include calculated fields', () => {

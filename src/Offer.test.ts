@@ -114,4 +114,54 @@ describe('Offer', () => {
             expect(offer.totals.totalNet).toBe(60);
         });
     });
+
+    describe('Bulk Operations', () => {
+        let offer = new Offer({
+            items: [
+                new OfferItem({ price: 100, id: '1', vatRate: 0 }),
+                new OfferItem({ price: 200, id: '2', vatRate: 0 })
+            ]
+        });
+
+        it('should set margin for all items', () => {
+            const updated = offer.setMargin(50);
+            expect(updated.items[0]?.margin).toBe(50);
+            expect(updated.items[1]?.margin).toBe(50);
+            expect(updated.items[0]?.customerPrice).toBe(200); // 100 / (1 - 0.5)
+        });
+
+        it('should set gross for specific items', () => {
+            const updated = offer.setGross(100, ['1']);
+            expect(updated.items[0]?.gross).toBe(100);
+            expect(updated.items[1]?.gross).toBe(0); // Item 2 was not updated
+        });
+
+        it('should set discount for all items', () => {
+            const updated = offer.setDiscount(10);
+            expect(updated.items[0]?.discount).toBe(10);
+            expect(updated.items[1]?.discount).toBe(10);
+            expect(updated.items[0]?.pricePerBottle).toBe(90);
+        });
+
+        it('should set quantity for all items', () => {
+            const updated = offer.setQuantity(5);
+            expect(updated.items[0]?.quantity).toBe(5);
+            expect(updated.items[1]?.quantity).toBe(5);
+        });
+
+        it('should set vatRate for all items', () => {
+            const updated = offer.setVatRate(25);
+            expect(updated.items[0]?.vatRate).toBe(25);
+            expect(updated.items[1]?.vatRate).toBe(25);
+        });
+
+        it('should set unit only if valid', () => {
+            let updated = offer.setUnit('case_6');
+            expect(updated.items[0]?.unit).toBe('case_6');
+
+            // Should ignore invalid unit and return self/same state
+            const invalidUpdate = updated.setUnit('NON_EXISTENT');
+            expect(invalidUpdate.items[0]?.unit).toBe('case_6');
+        });
+    });
 });

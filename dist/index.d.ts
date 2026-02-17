@@ -8,6 +8,8 @@ interface ItemConfig {
     tags?: string[];
     id?: string;
     gross?: number;
+    customerPrice?: number;
+    pricePerBottle?: number;
     data?: Record<string, any>;
 }
 interface OfferTotals {
@@ -26,7 +28,7 @@ declare class OfferItem {
     readonly vatRate: number;
     readonly tags: string[];
     readonly data: Record<string, any>;
-    private readonly _isExplicitGross;
+    private readonly _explicitFields;
     readonly pricePerBottle: number;
     readonly pricePerUnit: number;
     readonly gross: number;
@@ -34,11 +36,7 @@ declare class OfferItem {
     readonly customerPrice: number;
     readonly totalPrice: number;
     constructor(config: ItemConfig);
-    private _calculate;
     update(fields: Partial<ItemConfig>): OfferItem;
-    updateCustomerPrice(target: number): OfferItem;
-    updatePricePerBottle(target: number): OfferItem;
-    updateGross(target: number): OfferItem;
     toConfig(): ItemConfig;
     toJSON(): {
         pricePerBottle: number;
@@ -99,7 +97,13 @@ declare class Offer {
     /**
      * Bulk update field across multiple items
      */
-    bulkUpdateField(ids: string[], field: keyof ItemConfig, value: any): Offer;
+    bulkUpdateField(ids: string[] | undefined, field: keyof ItemConfig, value: any): Offer;
+    setMargin(value: number, ids?: string[]): Offer;
+    setGross(value: number, ids?: string[]): Offer;
+    setDiscount(value: number, ids?: string[]): Offer;
+    setQuantity(value: number, ids?: string[]): Offer;
+    setVatRate(value: number, ids?: string[]): Offer;
+    setUnit(unit: string, ids?: string[]): Offer;
     /**
      * Serialize for API storage
      */
