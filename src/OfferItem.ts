@@ -83,6 +83,11 @@ export class OfferItem {
         return this.update({ margin: newMargin });
     }
 
+    updatePricePerBottle(target: number): OfferItem {
+        const newDiscount = round((1 - target / this.price) * 100);
+        return this.update({ discount: newDiscount });
+    }
+
     toConfig(): ItemConfig {
         return {
             id: this.id,

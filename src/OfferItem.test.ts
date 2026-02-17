@@ -49,9 +49,24 @@ describe('OfferItem', () => {
             });
 
             // Price per bottle: 100 * 0.9 = 90
+            expect(item.price).toBe(100);
             expect(item.pricePerBottle).toBe(90);
             expect(item.vatAmount).toBe(18); // 90 * 0.2
             expect(item.customerPrice).toBe(108);
+        });
+
+        it('should handle reverse discount calculation correctly', () => {
+            const item = new OfferItem({
+                price: 100,
+                discount: 0,
+                vatRate: 20,
+                quantity: 1
+            });
+
+            // set price per bottle to 90
+            const updated = item.updatePricePerBottle(90);
+            expect(updated.pricePerBottle).toBe(90);
+            expect(updated.discount).toBe(10);
         });
 
         it('should handle margin correctly', () => {
