@@ -81,7 +81,7 @@ export class OfferItem {
             this.customerPrice = round(priceBeforeVat + this.vatAmount);
         }
 
-        this.totalPrice = this.customerPrice * multiplier * this.quantity;
+        this.totalPrice = this.pricePerUnit * this.quantity;
 
         Object.freeze(this); // Ensure immutability
     }

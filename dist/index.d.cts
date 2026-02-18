@@ -15,9 +15,8 @@ interface ItemConfig {
     data?: Record<string, any>;
 }
 interface OfferTotals {
-    totalNet: number;
-    totalVat: number;
-    totalGross: number;
+    totalPrice: number;
+    totalSaved: number;
 }
 
 declare class OfferItem {

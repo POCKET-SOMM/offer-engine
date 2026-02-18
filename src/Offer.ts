@@ -36,12 +36,17 @@ export class Offer {
 
     private _calculateGrandTotals(): OfferTotals {
         return this.items.reduce(
-            (acc, item) => ({
-                totalNet: round(acc.totalNet + item.pricePerUnit * item.quantity),
-                totalVat: round(acc.totalVat + item.vatAmount * (item.quantity * this._getMultiplier(item))),
-                totalGross: round(acc.totalGross + item.totalPrice), // totalPrice in Item is already calculated
-            }),
-            { totalNet: 0, totalVat: 0, totalGross: 0 }
+            (acc, item) => {
+                const multiplier = this._getMultiplier(item);
+                const volume = item.quantity * multiplier;
+                const savedOnItem = round((item.price - item.pricePerBottle) * volume);
+
+                return {
+                    totalPrice: round(acc.totalPrice + item.totalPrice),
+                    totalSaved: round(acc.totalSaved + savedOnItem),
+                };
+            },
+            { totalPrice: 0, totalSaved: 0 }
         );
     }
 

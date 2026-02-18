@@ -25,7 +25,6 @@ export interface CalculatedTotals {
 }
 
 export interface OfferTotals {
-    totalNet: number;
-    totalVat: number;
-    totalGross: number;
+    totalPrice: number;
+    totalSaved: number;
 }

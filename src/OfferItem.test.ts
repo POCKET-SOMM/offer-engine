@@ -17,7 +17,7 @@ describe('OfferItem', () => {
             expect(item.gross).toBe(0);
             expect(item.vatAmount).toBe(20);
             expect(item.customerPrice).toBe(120);
-            expect(item.totalPrice).toBe(120);
+            expect(item.totalPrice).toBe(100); // Net total
             expect(item.glassPrice).toBe(0);
             expect(item.availableUnits).toEqual(['bottle']);
         });
@@ -50,7 +50,7 @@ describe('OfferItem', () => {
             expect(item.gross).toBe(81.64);
             expect(item.vatAmount).toBe(29.74);
             expect(item.customerPrice).toBe(146.37);
-            expect(item.totalPrice).toBe(146.37);
+            expect(item.totalPrice).toBe(34.99); // Net total
         });
 
         it('should handle discount correctly', () => {
@@ -126,7 +126,7 @@ describe('OfferItem', () => {
 
             expect(item.pricePerBottle).toBe(10);
             expect(item.pricePerUnit).toBe(60); // 10 * 6
-            expect(item.totalPrice).toBeCloseTo(75.3);
+            expect(item.totalPrice).toBe(60); // Net total
         });
 
         it('should handle quantity correctly', () => {
@@ -135,13 +135,9 @@ describe('OfferItem', () => {
                 unit: 'bottle',
                 quantity: 5
             });
-            // Net unit: 10
-            // VAT: 2.55
-            // Gross Unit: 12.55
-            // Total (5x): 62.75
 
             expect(item.pricePerUnit).toBe(10);
-            expect(item.totalPrice).toBe(62.75);
+            expect(item.totalPrice).toBe(50); // Net total: 10 * 5
         });
     });
 
