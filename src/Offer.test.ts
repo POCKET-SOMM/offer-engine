@@ -155,6 +155,12 @@ describe('Offer', () => {
             expect(updated.items[1]?.vatRate).toBe(25);
         });
 
+        it('should set glassPrice for all items', () => {
+            const updated = offer.setGlassPrice(12);
+            expect(updated.items[0]?.glassPrice).toBe(12);
+            expect(updated.items[1]?.glassPrice).toBe(12);
+        });
+
         it('should set unit only if valid', () => {
             let updated = offer.setUnit('case_6');
             expect(updated.items[0]?.unit).toBe('case_6');
@@ -162,6 +168,30 @@ describe('Offer', () => {
             // Should ignore invalid unit and return self/same state
             const invalidUpdate = updated.setUnit('NON_EXISTENT');
             expect(invalidUpdate.items[0]?.unit).toBe('case_6');
+        });
+
+        it('should bulk round customer prices', () => {
+            const o = new Offer({
+                items: [
+                    new OfferItem({ price: 10, margin: 39, vatRate: 0, id: '1' }), // 16.39
+                    new OfferItem({ price: 10, margin: 40, vatRate: 0, id: '2' })  // 16.67
+                ]
+            });
+            const rounded = o.roundCustomerPrices();
+            expect(rounded.items[0]?.customerPrice).toBe(16);
+            expect(rounded.items[1]?.customerPrice).toBe(17);
+        });
+
+        it('should bulk round glass prices', () => {
+            const o = new Offer({
+                items: [
+                    new OfferItem({ price: 10, glassPrice: 12.34, id: '1' }),
+                    new OfferItem({ price: 10, glassPrice: 12.67, id: '2' })
+                ]
+            });
+            const rounded = o.roundGlassPrices(0.5);
+            expect(rounded.items[0]?.glassPrice).toBe(12.5);
+            expect(rounded.items[1]?.glassPrice).toBe(12.5);
         });
     });
 });

@@ -140,6 +140,26 @@ export class Offer {
         return this.bulkUpdateField(ids, 'vatRate', value);
     }
 
+    setGlassPrice(value: number, ids?: string[]): Offer {
+        return this.bulkUpdateField(ids, 'glassPrice', value);
+    }
+
+    roundCustomerPrices(step: number = 1, ids?: string[]): Offer {
+        const newItems = this.items.map(item => {
+            if (ids && !ids.includes(item.id)) return item;
+            return item.roundCustomerPrice(step);
+        });
+        return new Offer({ ...this, items: newItems });
+    }
+
+    roundGlassPrices(step: number = 1, ids?: string[]): Offer {
+        const newItems = this.items.map(item => {
+            if (ids && !ids.includes(item.id)) return item;
+            return item.roundGlassPrice(step);
+        });
+        return new Offer({ ...this, items: newItems });
+    }
+
     setUnit(unit: string, ids?: string[]): Offer {
         if (!UNIT_MULTIPLIERS[unit.toUpperCase()]) {
             return this;

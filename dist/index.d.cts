@@ -10,6 +10,7 @@ interface ItemConfig {
     gross?: number;
     customerPrice?: number;
     pricePerBottle?: number;
+    glassPrice?: number;
     data?: Record<string, any>;
 }
 interface OfferTotals {
@@ -27,6 +28,7 @@ declare class OfferItem {
     readonly quantity: number;
     readonly vatRate: number;
     readonly tags: string[];
+    readonly glassPrice: number;
     readonly data: Record<string, any>;
     private readonly _explicitFields;
     readonly pricePerBottle: number;
@@ -37,6 +39,8 @@ declare class OfferItem {
     readonly totalPrice: number;
     constructor(config: ItemConfig);
     update(fields: Partial<ItemConfig>): OfferItem;
+    roundCustomerPrice(step?: number): OfferItem;
+    roundGlassPrice(step?: number): OfferItem;
     toConfig(): ItemConfig;
     toJSON(): {
         pricePerBottle: number;
@@ -53,6 +57,7 @@ declare class OfferItem {
         vatRate?: number;
         tags?: string[];
         id?: string;
+        glassPrice?: number;
         data?: Record<string, any>;
     };
 }
@@ -103,6 +108,9 @@ declare class Offer {
     setDiscount(value: number, ids?: string[]): Offer;
     setQuantity(value: number, ids?: string[]): Offer;
     setVatRate(value: number, ids?: string[]): Offer;
+    setGlassPrice(value: number, ids?: string[]): Offer;
+    roundCustomerPrices(step?: number, ids?: string[]): Offer;
+    roundGlassPrices(step?: number, ids?: string[]): Offer;
     setUnit(unit: string, ids?: string[]): Offer;
     /**
      * Serialize for API storage
@@ -126,6 +134,7 @@ declare class Offer {
             vatRate?: number;
             tags?: string[];
             id?: string;
+            glassPrice?: number;
             data?: Record<string, any>;
         }[];
         totals: OfferTotals;

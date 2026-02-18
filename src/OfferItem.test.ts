@@ -18,6 +18,15 @@ describe('OfferItem', () => {
             expect(item.vatAmount).toBe(20);
             expect(item.customerPrice).toBe(120);
             expect(item.totalPrice).toBe(120);
+            expect(item.glassPrice).toBe(0);
+        });
+
+        it('should handle glassPrice provided in config', () => {
+            const item = new OfferItem({
+                price: 100,
+                glassPrice: 15
+            });
+            expect(item.glassPrice).toBe(15);
         });
 
         it('should match the user provided example calculation', () => {
@@ -161,6 +170,40 @@ describe('OfferItem', () => {
             // Note: margin is rounded in results if derived, but we verify the exact target is kept
             expect(updated.margin).toBe(50);
             expect(item.margin).toBe(0); // Original untouched
+        });
+    });
+
+    describe('Rounding', () => {
+        it('should round customerPrice to closest whole number by default', () => {
+            const item = new OfferItem({ price: 10, vatRate: 0, margin: 39 });
+            // 10 / (1 - 0.39) = 16.3934... -> rounds to 16.39
+            expect(item.customerPrice).toBe(16.39);
+
+            const rounded = item.roundCustomerPrice();
+            expect(rounded.customerPrice).toBe(16);
+        });
+
+        it('should round customerPrice to specific step (0.5)', () => {
+            const item = new OfferItem({ price: 10, vatRate: 0, margin: 39 });
+            // customerPrice: 16.39
+            const rounded = item.roundCustomerPrice(0.5);
+            expect(rounded.customerPrice).toBe(16.5);
+        });
+
+        it('should round customerPrice to specific step (0.1)', () => {
+            const item = new OfferItem({ price: 10, vatRate: 0, margin: 39 });
+            // customerPrice: 16.39
+            const rounded = item.roundCustomerPrice(0.1);
+            expect(rounded.customerPrice).toBe(16.4);
+        });
+
+        it('should round glassPrice', () => {
+            const item = new OfferItem({ price: 10, glassPrice: 12.34 });
+            const rounded = item.roundGlassPrice();
+            expect(rounded.glassPrice).toBe(12);
+
+            const roundedHalf = item.roundGlassPrice(0.5);
+            expect(roundedHalf.glassPrice).toBe(12.5);
         });
     });
 

@@ -10,6 +10,7 @@ export interface ItemConfig {
     gross?: number;
     customerPrice?: number;
     pricePerBottle?: number;
+    glassPrice?: number;
     data?: Record<string, any>;
 }
 
