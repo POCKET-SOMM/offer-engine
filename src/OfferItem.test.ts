@@ -211,16 +211,41 @@ describe('OfferItem', () => {
     });
 
     describe('Priority Hierarchy & Drift Prevention', () => {
-        it('should prioritize customerPrice over gross and margin', () => {
+        it('should prioritized explicit fields over derived versions', () => {
             const item = new OfferItem({
                 price: 100,
-                margin: 10,
-                customerPrice: 200, // This should win
+                customerPrice: 200,
                 vatRate: 0
             });
 
             expect(item.customerPrice).toBe(200);
             expect(item.gross).toBe(100);
+        });
+
+        it('should prevent "discount drift" for specific edge cases (e.g., 19.89 @ 23% discount)', () => {
+            // User example:
+            // Price: 19.89
+            // Discount: 23%
+            // Resulting pricePerBottle: round(19.89 * 0.77) = round(15.3153) = 15.32
+            // Reverse discount if calculated from 15.32: (1 - 15.32/19.89) * 100 = 22.97637... -> 22.98
+            // The item should KEEP 23% as its discount field if it was set explicitly.
+
+            let item = new OfferItem({
+                price: 19.89,
+                discount: 23,
+                vatRate: 25.5
+            });
+
+            expect(item.discount).toBe(23);
+
+            // Simulation of update that triggers re-serialization
+            item = item.update({ quantity: 2 });
+            expect(item.discount).toBe(23); // Should still be exactly 23
+
+            // Simulation of full re-serialization
+            const config = item.toConfig();
+            const reCreated = new OfferItem(config);
+            expect(reCreated.discount).toBe(23);
         });
 
         it('should prioritize gross over margin', () => {
@@ -289,7 +314,8 @@ describe('OfferItem', () => {
             const config = item.toConfig();
 
             expect(config.customerPrice).toBe(200);
-            expect(config.margin).toBeDefined();
+            // Margin should be OMITTED because customerPrice is the source of truth
+            expect(config.margin).toBeUndefined();
         });
 
         it('toJSON should include calculated fields', () => {

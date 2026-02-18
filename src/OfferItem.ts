@@ -40,6 +40,8 @@ export class OfferItem {
         if (config.customerPrice !== undefined) this._explicitFields.add('customerPrice');
         if (config.gross !== undefined) this._explicitFields.add('gross');
         if (config.pricePerBottle !== undefined) this._explicitFields.add('pricePerBottle');
+        if (config.discount !== undefined) this._explicitFields.add('discount');
+        if (config.margin !== undefined) this._explicitFields.add('margin');
 
         // 1. Resolve Price Per Bottle and Discount
         if (config.pricePerBottle !== undefined) {
@@ -122,8 +124,6 @@ export class OfferItem {
         const config: ItemConfig = {
             id: this.id,
             price: this.price,
-            discount: this.discount,
-            margin: this.margin,
             unit: this.unit,
             quantity: this.quantity,
             vatRate: this.vatRate,
@@ -133,9 +133,29 @@ export class OfferItem {
             data: { ...this.data }
         };
 
-        if (this._explicitFields.has('customerPrice')) config.customerPrice = this.customerPrice;
-        if (this._explicitFields.has('gross')) config.gross = this.gross;
-        if (this._explicitFields.has('pricePerBottle')) config.pricePerBottle = this.pricePerBottle;
+        // Precision / Drift Prevention:
+        // We only export fields that were explicitly set as targets.
+        // If a higher priority target exists, we don't need to export the lower ones
+        // as they will be re-derived anyway.
+        if (this._explicitFields.has('customerPrice')) {
+            config.customerPrice = this.customerPrice;
+        } else if (this._explicitFields.has('gross')) {
+            config.gross = this.gross;
+        } else if (this._explicitFields.has('margin')) {
+            config.margin = this.margin;
+        } else {
+            // Default fallback if no "sale price" target was set
+            config.margin = this.margin;
+        }
+
+        if (this._explicitFields.has('pricePerBottle')) {
+            config.pricePerBottle = this.pricePerBottle;
+        } else if (this._explicitFields.has('discount')) {
+            config.discount = this.discount;
+        } else {
+            // Default fallback
+            config.discount = this.discount;
+        }
 
         return config;
     }
