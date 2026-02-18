@@ -1,0 +1,28 @@
+# @pocket-somm/offer-engine
+
+Aagnostic calculation engine for offers, designed with immutability and precision in mind.
+
+## Core Principles
+- **Immutability**: All operations on `Offer` and `OfferItem` return new instances.
+- **Precision**: Implements a "No-Drift" calculation engine. Setting an exact target (like `customerPrice` or `gross`) locks that value, preventing rounding errors from derived fields (like `margin`) from drifting the final price.
+- **Priority Hierarchy**: When resolving conflicts, the engine prioritizes: `customerPrice` > `gross` > `pricePerBottle` > `margin/discount`.
+
+## Key Components
+
+### OfferItem (`src/OfferItem.ts`)
+The foundational unit representing a line item in an offer.
+- **Financial Fields**: `price`, `discount`, `margin`, `gross`, `vatRate`, `vatAmount`, `customerPrice`, `glassPrice`.
+- **Packaging**: Supports units (e.g., `bottle`, `case_6`, `case_12`).
+- **Update Patterns**: Use `.update({ ... })` for single or multiple field changes.
+- **Rounding**: `.roundCustomerPrice(step)` and `.roundGlassPrice(step)` for precision adjustments.
+
+### Offer (`src/Offer.ts`)
+A collection of `OfferItem`s with aggregated totals.
+- **Bulk Operations**: `setMargin`, `setGross`, `setDiscount`, `setQuantity`, `setVatRate`, `setGlassPrice`, `setUnit`.
+- **Totals**: Provides `totalNet`, `totalVat`, and `totalGross` for the entire offer.
+- **Updates**: Individual item updates via `updateItem(id, fields|fn)`.
+
+## Usage for Agents
+- Always use the `update` methods rather than creating new objects from scratch if you want to preserve the "lock" on explicit targets.
+- The `dist/` directory is built using `tsup`. Run `npm run build` after changes.
+- Verification is done via `vitest`. Run `npm test`.
