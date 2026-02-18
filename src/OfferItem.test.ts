@@ -18,7 +18,7 @@ describe('OfferItem', () => {
             expect(item.vatAmount).toBe(20);
             expect(item.customerPrice).toBe(120);
             expect(item.totalPrice).toBe(100); // Net total
-            expect(item.glassPrice).toBe(0);
+            expect(item.glassPrice).toBeUndefined();
             expect(item.availableUnits).toEqual(['bottle']);
         });
 

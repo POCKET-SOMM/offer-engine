@@ -12,7 +12,7 @@ export class OfferItem {
     public readonly vatRate: number;
     public readonly tags: string[];
     public readonly availableUnits: string[];
-    public readonly glassPrice: number;
+    public readonly glassPrice: number | undefined;
     public readonly data: Record<string, any>;
 
     // Calculated fields
@@ -31,7 +31,7 @@ export class OfferItem {
         this.vatRate = config.vatRate ?? 25.5;
         this.tags = config.tags || [];
         this.availableUnits = config.availableUnits || ['bottle'];
-        this.glassPrice = config.glassPrice || 0;
+        this.glassPrice = config.glassPrice;
         this.data = config.data || {};
 
         // 1. Resolve Price Per Bottle and Discount
@@ -124,6 +124,7 @@ export class OfferItem {
     }
 
     roundGlassPrice(step: number = 1): OfferItem {
+        if (this.glassPrice === undefined) return this;
         const roundedValue = Math.round(this.glassPrice / step) * step;
         return this.update({ glassPrice: round(roundedValue) });
     }

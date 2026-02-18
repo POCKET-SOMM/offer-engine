@@ -1,18 +1,18 @@
 export interface ItemConfig {
     price: number;
-    discount?: number;
-    margin?: number;
-    unit?: string;
-    quantity?: number;
-    vatRate?: number;
-    tags?: string[];
-    id?: string;
-    gross?: number;
-    customerPrice?: number;
-    pricePerBottle?: number;
-    glassPrice?: number;
-    availableUnits?: string[];
-    data?: Record<string, any>;
+    discount?: number | undefined;
+    margin?: number | undefined;
+    unit?: string | undefined;
+    quantity?: number | undefined;
+    vatRate?: number | undefined;
+    tags?: string[] | undefined;
+    id?: string | undefined;
+    gross?: number | undefined;
+    customerPrice?: number | undefined;
+    pricePerBottle?: number | undefined;
+    glassPrice?: number | undefined;
+    availableUnits?: string[] | undefined;
+    data?: Record<string, any> | undefined;
 }
 
 export interface CalculatedTotals {
