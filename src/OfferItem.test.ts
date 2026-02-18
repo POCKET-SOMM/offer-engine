@@ -302,7 +302,7 @@ describe('OfferItem', () => {
     });
 
     describe('Serialization', () => {
-        it('toConfig should return accurate explicit fields', () => {
+        it('toConfig should return all calculated fields to prevent drift', () => {
             const item = new OfferItem({
                 price: 100,
                 customerPrice: 200
@@ -310,8 +310,9 @@ describe('OfferItem', () => {
             const config = item.toConfig();
 
             expect(config.customerPrice).toBe(200);
-            // Margin should be OMITTED because customerPrice is the source of truth
-            expect(config.margin).toBeUndefined();
+            // Margin should be included now to preserve the state
+            expect(config.margin).toBe(37.25);
+            expect(config.gross).toBe(59.36);
         });
 
         it('toJSON should include calculated fields', () => {

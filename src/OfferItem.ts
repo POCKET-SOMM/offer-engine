@@ -1,6 +1,6 @@
 import { round } from './utils/math.js';
 import { UNIT_MULTIPLIERS } from './constants.js';
-import type { ItemConfig, CalculatedTotals } from './types.js';
+import type { ItemConfig } from './types.js';
 
 export class OfferItem {
     public readonly id: string;
@@ -14,8 +14,6 @@ export class OfferItem {
     public readonly availableUnits: string[];
     public readonly glassPrice: number;
     public readonly data: Record<string, any>;
-
-    private readonly _explicitFields: Set<keyof ItemConfig>;
 
     // Calculated fields
     public readonly pricePerBottle: number;
@@ -36,15 +34,12 @@ export class OfferItem {
         this.glassPrice = config.glassPrice || 0;
         this.data = config.data || {};
 
-        this._explicitFields = new Set();
-        if (config.customerPrice !== undefined) this._explicitFields.add('customerPrice');
-        if (config.gross !== undefined) this._explicitFields.add('gross');
-        if (config.pricePerBottle !== undefined) this._explicitFields.add('pricePerBottle');
-        if (config.discount !== undefined) this._explicitFields.add('discount');
-        if (config.margin !== undefined) this._explicitFields.add('margin');
-
         // 1. Resolve Price Per Bottle and Discount
-        if (config.pricePerBottle !== undefined) {
+        if (config.discount !== undefined && config.pricePerBottle !== undefined) {
+            // TRUST BOTH if provided (prevents drift)
+            this.discount = config.discount;
+            this.pricePerBottle = config.pricePerBottle;
+        } else if (config.pricePerBottle !== undefined) {
             this.pricePerBottle = config.pricePerBottle;
             this.discount = round((1 - this.pricePerBottle / this.price) * 100);
         } else {
@@ -58,20 +53,25 @@ export class OfferItem {
         // 2. Resolve calculations based on Hierarchy (customerPrice > gross > margin)
         if (config.customerPrice !== undefined) {
             this.customerPrice = config.customerPrice;
-            const priceBeforeVat = this.customerPrice / (1 + this.vatRate / 100);
-            this.vatAmount = round(this.customerPrice - priceBeforeVat);
-            this.gross = priceBeforeVat - this.pricePerBottle;
 
-            // Derive margin from resulting gross
-            this.margin = round((this.gross / priceBeforeVat) * 100);
+            // If we have gross or margin already provided, trust them to avoid re-derivation drift
+            if (config.gross !== undefined) {
+                this.gross = config.gross;
+                const priceBeforeVat = this.pricePerBottle + this.gross;
+                this.vatAmount = round(this.customerPrice - priceBeforeVat);
+                this.margin = config.margin !== undefined ? config.margin : round((this.gross / priceBeforeVat) * 100);
+            } else {
+                const priceBeforeVat = this.customerPrice / (1 + this.vatRate / 100);
+                this.vatAmount = round(this.customerPrice - priceBeforeVat);
+                this.gross = round(priceBeforeVat - this.pricePerBottle);
+                this.margin = config.margin !== undefined ? config.margin : round((this.gross / priceBeforeVat) * 100);
+            }
         } else if (config.gross !== undefined) {
             this.gross = config.gross;
             const priceBeforeVat = this.pricePerBottle + this.gross;
             this.vatAmount = round(priceBeforeVat * (this.vatRate / 100));
             this.customerPrice = round(priceBeforeVat + this.vatAmount);
-
-            // Derive margin
-            this.margin = round((this.gross / priceBeforeVat) * 100);
+            this.margin = config.margin !== undefined ? config.margin : round((this.gross / priceBeforeVat) * 100);
         } else {
             this.margin = round(config.margin || 0);
             const marginMultiplier = 1 - this.margin / 100;
@@ -81,30 +81,38 @@ export class OfferItem {
             this.customerPrice = round(priceBeforeVat + this.vatAmount);
         }
 
-        this.totalPrice = this.pricePerUnit * this.quantity;
+        this.totalPrice = round(this.pricePerUnit * this.quantity);
 
         Object.freeze(this); // Ensure immutability
     }
-
-
 
     // --- Immutable Update Patterns ---
 
     update(fields: Partial<ItemConfig>): OfferItem {
         const config = this.toConfig();
 
-        // Conflict Resolution:
-        // If updating a lower-priority field, we MUST clear higher-priority explicit fields
-        // to allow the new value to take effect.
-        if (fields.margin !== undefined && fields.gross === undefined && fields.customerPrice === undefined) {
+        // Dependency Busting Logic
+        if (fields.price !== undefined) {
+            // If vendor price changes, we keep discount and margin intent, but re-derive costs
+            delete config.pricePerBottle;
             delete config.gross;
             delete config.customerPrice;
         }
-        if (fields.gross !== undefined && fields.customerPrice === undefined) {
+
+        if (fields.discount !== undefined) delete config.pricePerBottle;
+        if (fields.pricePerBottle !== undefined) delete config.discount;
+
+        if (fields.margin !== undefined) {
+            delete config.gross;
             delete config.customerPrice;
         }
-        if (fields.discount !== undefined && fields.pricePerBottle === undefined) {
-            delete config.pricePerBottle;
+        if (fields.gross !== undefined) {
+            delete config.margin;
+            delete config.customerPrice;
+        }
+        if (fields.customerPrice !== undefined) {
+            delete config.margin;
+            delete config.gross;
         }
 
         return new OfferItem({ ...config, ...fields });
@@ -121,52 +129,29 @@ export class OfferItem {
     }
 
     toConfig(): ItemConfig {
-        const config: ItemConfig = {
+        return {
             id: this.id,
             price: this.price,
+            discount: this.discount,
+            margin: this.margin,
             unit: this.unit,
             quantity: this.quantity,
             vatRate: this.vatRate,
             tags: [...this.tags],
             availableUnits: [...this.availableUnits],
             glassPrice: this.glassPrice,
+            gross: this.gross,
+            customerPrice: this.customerPrice,
+            pricePerBottle: this.pricePerBottle,
             data: { ...this.data }
         };
-
-        // Precision / Drift Prevention:
-        // We only export fields that were explicitly set as targets.
-        // If a higher priority target exists, we don't need to export the lower ones
-        // as they will be re-derived anyway.
-        if (this._explicitFields.has('customerPrice')) {
-            config.customerPrice = this.customerPrice;
-        } else if (this._explicitFields.has('gross')) {
-            config.gross = this.gross;
-        } else if (this._explicitFields.has('margin')) {
-            config.margin = this.margin;
-        } else {
-            // Default fallback if no "sale price" target was set
-            config.margin = this.margin;
-        }
-
-        if (this._explicitFields.has('pricePerBottle')) {
-            config.pricePerBottle = this.pricePerBottle;
-        } else if (this._explicitFields.has('discount')) {
-            config.discount = this.discount;
-        } else {
-            // Default fallback
-            config.discount = this.discount;
-        }
-
-        return config;
     }
+
     toJSON() {
         return {
             ...this.toConfig(),
-            pricePerBottle: this.pricePerBottle,
             pricePerUnit: this.pricePerUnit,
-            gross: this.gross,
             vatAmount: this.vatAmount,
-            customerPrice: this.customerPrice,
             totalPrice: this.totalPrice
         };
     }

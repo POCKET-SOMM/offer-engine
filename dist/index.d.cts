@@ -31,7 +31,6 @@ declare class OfferItem {
     readonly availableUnits: string[];
     readonly glassPrice: number;
     readonly data: Record<string, any>;
-    private readonly _explicitFields;
     readonly pricePerBottle: number;
     readonly pricePerUnit: number;
     readonly gross: number;
@@ -44,11 +43,8 @@ declare class OfferItem {
     roundGlassPrice(step?: number): OfferItem;
     toConfig(): ItemConfig;
     toJSON(): {
-        pricePerBottle: number;
         pricePerUnit: number;
-        gross: number;
         vatAmount: number;
-        customerPrice: number;
         totalPrice: number;
         price: number;
         discount?: number;
@@ -58,6 +54,9 @@ declare class OfferItem {
         vatRate?: number;
         tags?: string[];
         id?: string;
+        gross?: number;
+        customerPrice?: number;
+        pricePerBottle?: number;
         glassPrice?: number;
         availableUnits?: string[];
         data?: Record<string, any>;
@@ -122,11 +121,8 @@ declare class Offer {
         title: string;
         menu: any;
         items: {
-            pricePerBottle: number;
             pricePerUnit: number;
-            gross: number;
             vatAmount: number;
-            customerPrice: number;
             totalPrice: number;
             price: number;
             discount?: number;
@@ -136,6 +132,9 @@ declare class Offer {
             vatRate?: number;
             tags?: string[];
             id?: string;
+            gross?: number;
+            customerPrice?: number;
+            pricePerBottle?: number;
             glassPrice?: number;
             availableUnits?: string[];
             data?: Record<string, any>;
