@@ -11,6 +11,7 @@ interface ItemConfig {
     customerPrice?: number;
     pricePerBottle?: number;
     glassPrice?: number;
+    availableUnits?: string[];
     data?: Record<string, any>;
 }
 interface OfferTotals {
@@ -28,6 +29,7 @@ declare class OfferItem {
     readonly quantity: number;
     readonly vatRate: number;
     readonly tags: string[];
+    readonly availableUnits: string[];
     readonly glassPrice: number;
     readonly data: Record<string, any>;
     private readonly _explicitFields;
@@ -58,6 +60,7 @@ declare class OfferItem {
         tags?: string[];
         id?: string;
         glassPrice?: number;
+        availableUnits?: string[];
         data?: Record<string, any>;
     };
 }
@@ -135,6 +138,7 @@ declare class Offer {
             tags?: string[];
             id?: string;
             glassPrice?: number;
+            availableUnits?: string[];
             data?: Record<string, any>;
         }[];
         totals: OfferTotals;

@@ -19,14 +19,17 @@ describe('OfferItem', () => {
             expect(item.customerPrice).toBe(120);
             expect(item.totalPrice).toBe(120);
             expect(item.glassPrice).toBe(0);
+            expect(item.availableUnits).toEqual(['bottle']);
         });
 
         it('should handle glassPrice provided in config', () => {
             const item = new OfferItem({
                 price: 100,
-                glassPrice: 15
+                glassPrice: 15,
+                availableUnits: ['bottle', 'case_6']
             });
             expect(item.glassPrice).toBe(15);
+            expect(item.availableUnits).toEqual(['bottle', 'case_6']);
         });
 
         it('should match the user provided example calculation', () => {

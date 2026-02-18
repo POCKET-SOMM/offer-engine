@@ -11,6 +11,7 @@ export class OfferItem {
     public readonly quantity: number;
     public readonly vatRate: number;
     public readonly tags: string[];
+    public readonly availableUnits: string[];
     public readonly glassPrice: number;
     public readonly data: Record<string, any>;
 
@@ -31,6 +32,7 @@ export class OfferItem {
         this.quantity = config.quantity ?? 1;
         this.vatRate = config.vatRate ?? 25.5;
         this.tags = config.tags || [];
+        this.availableUnits = config.availableUnits || ['bottle'];
         this.glassPrice = config.glassPrice || 0;
         this.data = config.data || {};
 
@@ -126,6 +128,7 @@ export class OfferItem {
             quantity: this.quantity,
             vatRate: this.vatRate,
             tags: [...this.tags],
+            availableUnits: [...this.availableUnits],
             glassPrice: this.glassPrice,
             data: { ...this.data }
         };

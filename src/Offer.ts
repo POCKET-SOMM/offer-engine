@@ -164,7 +164,14 @@ export class Offer {
         if (!UNIT_MULTIPLIERS[unit.toUpperCase()]) {
             return this;
         }
-        return this.bulkUpdateField(ids, 'unit', unit);
+
+        const newItems = this.items.map(item => {
+            if (ids && !ids.includes(item.id)) return item;
+            if (!item.availableUnits.includes(unit)) return item;
+            return item.update({ unit });
+        });
+
+        return new Offer({ ...this, items: newItems });
     }
 
     /**

@@ -161,13 +161,21 @@ describe('Offer', () => {
             expect(updated.items[1]?.glassPrice).toBe(12);
         });
 
-        it('should set unit only if valid', () => {
-            let updated = offer.setUnit('case_6');
-            expect(updated.items[0]?.unit).toBe('case_6');
+        it('should set unit only if valid globally and allowed for item', () => {
+            const o = new Offer({
+                items: [
+                    new OfferItem({ price: 10, id: '1', availableUnits: ['bottle', 'case_6'] }),
+                    new OfferItem({ price: 10, id: '2', availableUnits: ['bottle'] })
+                ]
+            });
 
-            // Should ignore invalid unit and return self/same state
+            let updated = o.setUnit('case_6');
+            expect(updated.items[0]?.unit).toBe('case_6');
+            expect(updated.items[1]?.unit).toBe('bottle'); // Should NOT update as it's not available
+
+            // Should ignore invalid unit entirely and return self
             const invalidUpdate = updated.setUnit('NON_EXISTENT');
-            expect(invalidUpdate.items[0]?.unit).toBe('case_6');
+            expect(invalidUpdate).toBe(updated);
         });
 
         it('should bulk round customer prices', () => {

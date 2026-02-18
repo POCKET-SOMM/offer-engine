@@ -11,6 +11,7 @@ export interface ItemConfig {
     customerPrice?: number;
     pricePerBottle?: number;
     glassPrice?: number;
+    availableUnits?: string[];
     data?: Record<string, any>;
 }
 
