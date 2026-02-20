@@ -371,17 +371,20 @@ describe('OfferItem', () => {
         });
 
         it('should allow company-specific logic via overrides (Alko example)', () => {
-            const wine = { price: 10, bottlesPerCase: 12 };
+            const wine = { id: '123123', price: 10 };
 
             // App-side logic:
-            const companyId = 5;
-            const alkoOverrides: any = {};
-            if (companyId === 5) {
-                alkoOverrides.availableUnits = ['bottle', 'case_12', 'case_6'];
+            const overrides = {
+                margin: 50,
+                unit: 'case_6',
+                vatRate: 20
             }
 
-            const item = OfferItem.fromWine(wine, alkoOverrides);
-            expect(item.availableUnits).toEqual(['bottle', 'case_12', 'case_6']);
+            const item = OfferItem.fromWine(wine, overrides);
+
+            expect(item.margin).toBe(50);
+            expect(item.vatRate).toBe(20);
+            expect(item.unit).toBe('case_6')
         });
     });
 });

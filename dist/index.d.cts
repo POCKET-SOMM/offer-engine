@@ -61,6 +61,11 @@ declare class OfferItem {
         availableUnits?: string[] | undefined;
         data?: Record<string, any> | undefined;
     };
+    /**
+     * Create an OfferItem from a wine object.
+     * Use overrides to provide custom logic like company-specific unit defaults.
+     */
+    static fromWine(wine: any, overrides?: Partial<ItemConfig>): OfferItem;
 }
 
 interface OfferConfig {
