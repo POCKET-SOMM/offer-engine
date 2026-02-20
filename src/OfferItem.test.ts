@@ -371,9 +371,15 @@ describe('OfferItem', () => {
         });
 
         it('should allow company-specific logic via overrides (Alko example)', () => {
-            const wine = { id: '123123', price: 10 };
+            // our qdrant/sql data
+            const wine = {
+                id: '123123',
+                price: 10,
+                bottlesPerCase: 6
+                // ... other wine data irrelevant to offer
+            };
 
-            // App-side logic:
+            // company specific stuff
             const overrides = {
                 margin: 50,
                 unit: 'case_6',
