@@ -323,4 +323,65 @@ describe('OfferItem', () => {
             expect(json.customerPrice).toBeDefined();
         });
     });
+
+    describe('fromWine static factory', () => {
+        it('should create an OfferItem from a basic wine object', () => {
+            const wine = {
+                id: 'wine-123',
+                price: '45.50',
+                qtyIncrements: 1,
+                bottlesPerCase: 6,
+            };
+
+            const item = OfferItem.fromWine(wine);
+
+            expect(item.id).toBe('wine-123');
+            expect(item.price).toBe(45.50);
+            expect(item.availableUnits).toEqual(['bottle', 'case_6']);
+            expect(item.unit).toBe('bottle');
+            expect(item.data.availableUnits).toEqual(['bottle', 'case_6']);
+        });
+
+        it('should handle missing quantity increments as single bottle available', () => {
+            const wine = { price: 10 };
+            const item = OfferItem.fromWine(wine);
+            expect(item.availableUnits).toContain('bottle');
+        });
+
+        it('should handle case-only wines (qtyIncrements > 1)', () => {
+            const wine = { price: 10, qtyIncrements: 6, bottlesPerCase: 6 };
+            const item = OfferItem.fromWine(wine);
+            expect(item.availableUnits).toEqual(['case_6']);
+            expect(item.unit).toBe('case_6');
+        });
+
+        it('should apply overrides correctly', () => {
+            const wine = { price: 10, bottlesPerCase: 6 };
+            const item = OfferItem.fromWine(wine, {
+                unit: 'case_6',
+                quantity: 12,
+                discount: 10
+            });
+
+            expect(item.unit).toBe('case_6');
+            expect(item.quantity).toBe(12);
+            expect(item.discount).toBe(10);
+            expect(item.pricePerBottle).toBe(9); // 10 * 0.9
+            expect(item.pricePerUnit).toBe(54); // 9 * 6
+        });
+
+        it('should allow company-specific logic via overrides (Alko example)', () => {
+            const wine = { price: 10, bottlesPerCase: 12 };
+
+            // App-side logic:
+            const companyId = 5;
+            const alkoOverrides: any = {};
+            if (companyId === 5) {
+                alkoOverrides.availableUnits = ['bottle', 'case_12', 'case_6'];
+            }
+
+            const item = OfferItem.fromWine(wine, alkoOverrides);
+            expect(item.availableUnits).toEqual(['bottle', 'case_12', 'case_6']);
+        });
+    });
 });

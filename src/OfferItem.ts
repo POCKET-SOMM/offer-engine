@@ -156,4 +156,38 @@ export class OfferItem {
             totalPrice: this.totalPrice
         };
     }
+
+    /**
+     * Create an OfferItem from a wine object.
+     * Use overrides to provide custom logic like company-specific unit defaults.
+     */
+    static fromWine(wine: any, overrides?: Partial<ItemConfig>): OfferItem {
+        const availableUnits: string[] = [];
+
+        // Single bottles are available if no quantity increment is specified or it is 1
+        if (wine.qtyIncrements === undefined || wine.qtyIncrements === 1) {
+            availableUnits.push('bottle');
+        }
+
+        // Add case option if wine is sold in multi-bottle cases
+        if (wine.bottlesPerCase && wine.bottlesPerCase > 1) {
+            availableUnits.push(`case_${wine.bottlesPerCase}`);
+        }
+
+        const config: ItemConfig = {
+            id: wine.id || crypto.randomUUID(),
+            price: parseFloat(wine.price) || 0,
+            discount: 0,
+            unit: availableUnits[0],
+            quantity: 1,
+            vatRate: 25.5,
+            margin: 70.0,
+            tags: [],
+            data: { ...wine, availableUnits },
+            availableUnits,
+            ...overrides
+        };
+
+        return new OfferItem(config);
+    }
 }
