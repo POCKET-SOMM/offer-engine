@@ -1,6 +1,6 @@
 import { round } from './utils/math.js';
 import { UNIT_MULTIPLIERS } from './constants.js';
-import type { ItemConfig } from './types.js';
+import type { ItemConfig, PourVolume } from './types.js';
 
 export class OfferItem {
     public readonly id: string;
@@ -13,6 +13,7 @@ export class OfferItem {
     public readonly tags: string[];
     public readonly availableUnits: string[];
     public readonly glassPrice: number | undefined;
+    public readonly pourVolumes: readonly PourVolume[];
     public readonly data: Record<string, any>;
 
     // Calculated fields
@@ -33,6 +34,20 @@ export class OfferItem {
         this.availableUnits = config.availableUnits || ['bottle'];
         this.glassPrice = config.glassPrice;
         this.data = config.data || {};
+
+        // Validate and normalize pour volumes
+        const rawPours = config.pourVolumes || [];
+        const validPours = rawPours.filter(p => p.volume > 0 && p.price >= 0);
+        // Deduplicate by volume (last wins), then sort ascending
+        const deduped = new Map<number, PourVolume>();
+        for (const pv of validPours) {
+            deduped.set(pv.volume, { ...pv });
+        }
+        this.pourVolumes = Object.freeze(
+            Array.from(deduped.values())
+                .sort((a, b) => a.volume - b.volume)
+                .map(pv => Object.freeze(pv))
+        );
 
         // 1. Resolve Price Per Bottle and Discount
         if (config.discount !== undefined && config.pricePerBottle !== undefined) {
@@ -129,6 +144,31 @@ export class OfferItem {
         return this.update({ glassPrice: round(roundedValue) });
     }
 
+    roundPourVolumePrices(step: number = 1): OfferItem {
+        if (this.pourVolumes.length === 0) return this;
+        const rounded = this.pourVolumes.map(pv => ({
+            ...pv,
+            price: round(Math.round(pv.price / step) * step),
+        }));
+        return this.update({ pourVolumes: rounded });
+    }
+
+    /** Set or update a pour volume. If volume exists, update price/name. If not, add it. */
+    setPourVolume(pv: PourVolume): OfferItem {
+        const existing = this.pourVolumes.filter(p => p.volume !== pv.volume);
+        return this.update({ pourVolumes: [...existing, pv] });
+    }
+
+    /** Remove a pour volume by ml value */
+    removePourVolume(volume: number): OfferItem {
+        return this.update({ pourVolumes: this.pourVolumes.filter(p => p.volume !== volume) });
+    }
+
+    /** Remove all pour volumes */
+    clearPourVolumes(): OfferItem {
+        return this.update({ pourVolumes: [] });
+    }
+
     toConfig(): ItemConfig {
         return {
             id: this.id,
@@ -141,6 +181,7 @@ export class OfferItem {
             tags: [...this.tags],
             availableUnits: [...this.availableUnits],
             glassPrice: this.glassPrice,
+            pourVolumes: this.pourVolumes.map(pv => ({ ...pv })),
             gross: this.gross,
             customerPrice: this.customerPrice,
             pricePerBottle: this.pricePerBottle,

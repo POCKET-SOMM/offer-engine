@@ -1,6 +1,6 @@
 import { UNIT_MULTIPLIERS } from './constants.js';
 import { OfferItem } from './OfferItem.js';
-import type { ItemConfig, OfferTotals } from './types.js';
+import type { ItemConfig, OfferTotals, PourVolume } from './types.js';
 import { round } from './utils/math.js';
 
 export interface OfferConfig {
@@ -145,6 +145,14 @@ export class Offer {
         return this.bulkUpdateField(ids, 'vatRate', value);
     }
 
+    setPourVolume(pv: PourVolume, ids?: string[]): Offer {
+        const newItems = this.items.map(item => {
+            if (ids && !ids.includes(item.id)) return item;
+            return item.setPourVolume(pv);
+        });
+        return new Offer({ ...this, items: newItems });
+    }
+
     setGlassPrice(value: number, ids?: string[]): Offer {
         return this.bulkUpdateField(ids, 'glassPrice', value);
     }
@@ -161,6 +169,14 @@ export class Offer {
         const newItems = this.items.map(item => {
             if (ids && !ids.includes(item.id)) return item;
             return item.roundGlassPrice(step);
+        });
+        return new Offer({ ...this, items: newItems });
+    }
+
+    roundPourVolumePrices(step: number = 1, ids?: string[]): Offer {
+        const newItems = this.items.map(item => {
+            if (ids && !ids.includes(item.id)) return item;
+            return item.roundPourVolumePrices(step);
         });
         return new Offer({ ...this, items: newItems });
     }

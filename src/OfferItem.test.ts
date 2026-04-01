@@ -393,4 +393,153 @@ describe('OfferItem', () => {
             expect(item.unit).toBe('case_6')
         });
     });
+
+    describe('Pour Volumes', () => {
+        it('defaults to empty array', () => {
+            const item = new OfferItem({ price: 100 });
+            expect(item.pourVolumes).toEqual([]);
+        });
+
+        it('initializes from config', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [
+                    { volume: 150, price: 15, name: 'Medium' },
+                    { volume: 100, price: 10 },
+                ],
+            });
+            expect(item.pourVolumes).toHaveLength(2);
+            // Should be sorted by volume ascending
+            expect(item.pourVolumes[0].volume).toBe(100);
+            expect(item.pourVolumes[1].volume).toBe(150);
+            expect(item.pourVolumes[1].name).toBe('Medium');
+        });
+
+        it('filters invalid entries (non-positive volume, negative price)', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [
+                    { volume: 0, price: 10 },
+                    { volume: -50, price: 10 },
+                    { volume: 150, price: -5 },
+                    { volume: 100, price: 10 },
+                ],
+            });
+            expect(item.pourVolumes).toHaveLength(1);
+            expect(item.pourVolumes[0].volume).toBe(100);
+        });
+
+        it('deduplicates by volume (last wins)', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [
+                    { volume: 150, price: 10 },
+                    { volume: 150, price: 20 },
+                ],
+            });
+            expect(item.pourVolumes).toHaveLength(1);
+            expect(item.pourVolumes[0].price).toBe(20);
+        });
+
+        it('setPourVolume adds a new pour', () => {
+            const item = new OfferItem({ price: 100 });
+            const updated = item.setPourVolume({ volume: 150, price: 15 });
+            expect(updated.pourVolumes).toHaveLength(1);
+            expect(updated.pourVolumes[0]).toEqual({ volume: 150, price: 15 });
+        });
+
+        it('setPourVolume updates existing pour (same volume)', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [{ volume: 150, price: 10 }],
+            });
+            const updated = item.setPourVolume({ volume: 150, price: 20, name: 'Medium' });
+            expect(updated.pourVolumes).toHaveLength(1);
+            expect(updated.pourVolumes[0].price).toBe(20);
+            expect(updated.pourVolumes[0].name).toBe('Medium');
+        });
+
+        it('removePourVolume removes by volume', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [
+                    { volume: 100, price: 10 },
+                    { volume: 150, price: 15 },
+                ],
+            });
+            const updated = item.removePourVolume(100);
+            expect(updated.pourVolumes).toHaveLength(1);
+            expect(updated.pourVolumes[0].volume).toBe(150);
+        });
+
+        it('clearPourVolumes empties the array', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [
+                    { volume: 100, price: 10 },
+                    { volume: 150, price: 15 },
+                ],
+            });
+            const updated = item.clearPourVolumes();
+            expect(updated.pourVolumes).toEqual([]);
+        });
+
+        it('survives toConfig -> new OfferItem round-trip', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [
+                    { volume: 150, price: 15, name: 'Medium' },
+                    { volume: 175, price: 18, name: 'Large' },
+                ],
+            });
+            const restored = new OfferItem(item.toConfig());
+            expect(restored.pourVolumes).toEqual(item.pourVolumes);
+        });
+
+        it('pourVolumes array is frozen (immutable)', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [{ volume: 150, price: 15 }],
+            });
+            expect(Object.isFrozen(item.pourVolumes)).toBe(true);
+            expect(Object.isFrozen(item.pourVolumes[0])).toBe(true);
+        });
+
+        it('allows price of 0', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [{ volume: 150, price: 0 }],
+            });
+            expect(item.pourVolumes).toHaveLength(1);
+            expect(item.pourVolumes[0].price).toBe(0);
+        });
+
+        it('roundPourVolumePrices rounds to step', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [
+                    { volume: 100, price: 10.73 },
+                    { volume: 150, price: 15.26 },
+                ],
+            });
+            const rounded = item.roundPourVolumePrices(1);
+            expect(rounded.pourVolumes[0].price).toBe(11);
+            expect(rounded.pourVolumes[1].price).toBe(15);
+        });
+
+        it('roundPourVolumePrices rounds to 0.5 step', () => {
+            const item = new OfferItem({
+                price: 100,
+                pourVolumes: [{ volume: 150, price: 15.26 }],
+            });
+            const rounded = item.roundPourVolumePrices(0.5);
+            expect(rounded.pourVolumes[0].price).toBe(15.5);
+        });
+
+        it('roundPourVolumePrices returns self if no pour volumes', () => {
+            const item = new OfferItem({ price: 100 });
+            const rounded = item.roundPourVolumePrices(1);
+            expect(rounded).toBe(item);
+        });
+    });
 });

@@ -1,3 +1,9 @@
+export interface PourVolume {
+    volume: number;      // ml, primary key (unique per item)
+    price: number;       // price for this pour
+    name?: string;       // optional display label (e.g. "Medium")
+}
+
 export interface ItemConfig {
     price: number;
     discount?: number | undefined;
@@ -11,6 +17,7 @@ export interface ItemConfig {
     customerPrice?: number | undefined;
     pricePerBottle?: number | undefined;
     glassPrice?: number | undefined;
+    pourVolumes?: PourVolume[] | undefined;
     availableUnits?: string[] | undefined;
     data?: Record<string, any> | undefined;
 }

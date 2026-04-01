@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Offer } from './Offer.js';
 import { OfferItem } from './OfferItem.js';
+import offerData from './offer.json' with { type: 'json' };
 
 describe('Offer', () => {
     describe('Initialization', () => {
@@ -186,5 +187,69 @@ describe('Bulk Operations', () => {
         const rounded = o.roundGlassPrices(0.5);
         expect(rounded.items[0]?.glassPrice).toBe(12.5);
         expect(rounded.items[1]?.glassPrice).toBe(12.5);
+    });
+});
+
+describe('Real Offer Data', () => {
+    let baseOffer: Offer;
+
+    beforeEach(() => {
+        // Load the offer data directly from the JSON
+        baseOffer = new Offer().addItems(offerData.items as any[]);
+    });
+
+    it('should load a real offer from JSON', () => {
+        expect(baseOffer.items.length).toBeGreaterThan(0);
+        // Verify key mapped fields exist
+        const firstItem = baseOffer.items[0];
+        expect(firstItem?.id).toBeDefined();
+        expect(firstItem?.price).toBeGreaterThan(0);
+        expect(firstItem?.vatRate).toBeDefined();
+        // data object should hold original extra fields
+        expect(firstItem?.data.title).toBeDefined();
+    });
+
+    it('should set margin to 50', () => {
+        const updated = baseOffer.setMargin(50);
+        
+        const item = updated.items[0];
+        expect(item?.margin).toBe(50);
+        expect(item?.customerPrice).toBeGreaterThan(item!.pricePerBottle);
+        // Verify immutability
+        expect(item).not.toBe(baseOffer.items[0]);
+    });
+
+    it('should set margin to 0.5', () => {
+        const updated = baseOffer.setMargin(0.5);
+        
+        const item = updated.items[0];
+        expect(item?.margin).toBe(0.5);
+        // Customer price should still be greater than or equal to vendor price, just very slightly
+        expect(item?.customerPrice).toBeGreaterThan(item!.pricePerBottle);
+        expect(item?.customerPrice).toBeLessThan(baseOffer.items[0]!.customerPrice); // assuming original margin > 0.5
+    });
+
+    it('should set discount to 10', () => {
+        const updated = baseOffer.setDiscount(10);
+        
+        const item = updated.items[0];
+        expect(item?.discount).toBe(10);
+        expect(item?.pricePerBottle).toBeLessThan(item!.price);
+    });
+
+    it('should round customer prices correctly', () => {
+        const withMargin = baseOffer.setMargin(33); // A random margin that likely yields decimals
+        const rounded = withMargin.roundCustomerPrices(1);
+        
+        const item = rounded.items[0];
+        expect(item?.customerPrice! % 1).toBe(0); // Should be an integer
+    });
+
+    it('should set glass price and round it', () => {
+        let updated = baseOffer.setGlassPrice(12.34);
+        updated = updated.roundGlassPrices(0.5);
+        
+        const item = updated.items[0];
+        expect(item?.glassPrice).toBe(12.5);
     });
 });

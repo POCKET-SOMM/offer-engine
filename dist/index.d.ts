@@ -1,3 +1,8 @@
+interface PourVolume {
+    volume: number;
+    price: number;
+    name?: string;
+}
 interface ItemConfig {
     price: number;
     discount?: number | undefined;
@@ -11,6 +16,7 @@ interface ItemConfig {
     customerPrice?: number | undefined;
     pricePerBottle?: number | undefined;
     glassPrice?: number | undefined;
+    pourVolumes?: PourVolume[] | undefined;
     availableUnits?: string[] | undefined;
     data?: Record<string, any> | undefined;
 }
@@ -30,6 +36,7 @@ declare class OfferItem {
     readonly tags: string[];
     readonly availableUnits: string[];
     readonly glassPrice: number | undefined;
+    readonly pourVolumes: readonly PourVolume[];
     readonly data: Record<string, any>;
     readonly pricePerBottle: number;
     readonly pricePerUnit: number;
@@ -41,6 +48,13 @@ declare class OfferItem {
     update(fields: Partial<ItemConfig>): OfferItem;
     roundCustomerPrice(step?: number): OfferItem;
     roundGlassPrice(step?: number): OfferItem;
+    roundPourVolumePrices(step?: number): OfferItem;
+    /** Set or update a pour volume. If volume exists, update price/name. If not, add it. */
+    setPourVolume(pv: PourVolume): OfferItem;
+    /** Remove a pour volume by ml value */
+    removePourVolume(volume: number): OfferItem;
+    /** Remove all pour volumes */
+    clearPourVolumes(): OfferItem;
     toConfig(): ItemConfig;
     toJSON(): {
         pricePerUnit: number;
@@ -58,6 +72,7 @@ declare class OfferItem {
         customerPrice?: number | undefined;
         pricePerBottle?: number | undefined;
         glassPrice?: number | undefined;
+        pourVolumes?: PourVolume[] | undefined;
         availableUnits?: string[] | undefined;
         data?: Record<string, any> | undefined;
     };
@@ -114,9 +129,11 @@ declare class Offer {
     setDiscount(value: number, ids?: string[]): Offer;
     setQuantity(value: number, ids?: string[]): Offer;
     setVatRate(value: number, ids?: string[]): Offer;
+    setPourVolume(pv: PourVolume, ids?: string[]): Offer;
     setGlassPrice(value: number, ids?: string[]): Offer;
     roundCustomerPrices(step?: number, ids?: string[]): Offer;
     roundGlassPrices(step?: number, ids?: string[]): Offer;
+    roundPourVolumePrices(step?: number, ids?: string[]): Offer;
     setUnit(unit: string, ids?: string[]): Offer;
     /**
      * Serialize for API storage
@@ -141,6 +158,7 @@ declare class Offer {
             customerPrice?: number | undefined;
             pricePerBottle?: number | undefined;
             glassPrice?: number | undefined;
+            pourVolumes?: PourVolume[] | undefined;
             availableUnits?: string[] | undefined;
             data?: Record<string, any> | undefined;
         }[];
@@ -149,4 +167,4 @@ declare class Offer {
     };
 }
 
-export { Offer, OfferItem };
+export { type ItemConfig, Offer, OfferItem, type PourVolume };
