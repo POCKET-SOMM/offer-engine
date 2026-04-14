@@ -114,8 +114,16 @@ export class OfferItem {
             delete config.customerPrice;
         }
 
-        if (fields.discount !== undefined) delete config.pricePerBottle;
-        if (fields.pricePerBottle !== undefined) delete config.discount;
+        if (fields.discount !== undefined) {
+            delete config.pricePerBottle;
+            delete config.customerPrice;
+            delete config.gross;
+        }
+        if (fields.pricePerBottle !== undefined) {
+            delete config.discount;
+            delete config.customerPrice;
+            delete config.gross;
+        }
 
         if (fields.margin !== undefined) {
             delete config.gross;

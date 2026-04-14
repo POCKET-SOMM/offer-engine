@@ -67,6 +67,25 @@ describe('OfferItem', () => {
             expect(item.customerPrice).toBe(108);
         });
 
+        it('should recalculate customerPrice when discount is updated via .update()', () => {
+            const item = new OfferItem({
+                price: 100,
+                margin: 50,
+                vatRate: 0,
+                discount: 0,
+            });
+
+            // No discount: pricePerBottle=100, margin=50% → customerPrice=200
+            expect(item.pricePerBottle).toBe(100);
+            expect(item.customerPrice).toBe(200);
+
+            // Apply 10% discount: pricePerBottle=90, margin still 50% → customerPrice=180
+            const updated = item.update({ discount: 10 });
+            expect(updated.pricePerBottle).toBe(90);
+            expect(updated.margin).toBe(50);
+            expect(updated.customerPrice).toBe(180);
+        });
+
         it('should handle reverse discount calculation correctly', () => {
             const item = new OfferItem({
                 price: 100,
