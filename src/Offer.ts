@@ -2,6 +2,8 @@ import { UNIT_MULTIPLIERS } from './constants.js';
 import { OfferItem } from './OfferItem.js';
 import type { ItemConfig, OfferTotals, PourVolume } from './types.js';
 import { round } from './utils/math.js';
+import { normalizeCustomGrouping, validateCategoryName } from './grouping/normalize.js';
+import type { CustomCategory, GroupingConfig } from './grouping/types.js';
 
 export interface OfferConfig {
     id?: string;
@@ -193,6 +195,126 @@ export class Offer {
         });
 
         return new Offer({ ...this, items: newItems });
+    }
+
+    // --- Grouping ---
+
+    private _withGrouping(grouping: GroupingConfig | null): Offer {
+        const nextData = { ...this.data };
+        if (grouping === null) {
+            delete nextData['grouping'];
+        } else {
+            nextData['grouping'] = grouping;
+        }
+        return new Offer({ ...this, data: nextData });
+    }
+
+    private _grouping(): GroupingConfig | undefined {
+        return this.data?.['grouping'] as GroupingConfig | undefined;
+    }
+
+    private _customCategories(): CustomCategory[] {
+        const g = this._grouping();
+        return g?.customCategories ? [...g.customCategories] : [];
+    }
+
+    /** Replace (or clear) the grouping config on offer.data. */
+    setGrouping(grouping: GroupingConfig | null): Offer {
+        return this._withGrouping(grouping);
+    }
+
+    /** Switch to custom mode, seeding with the provided categories (snapshot from current grouping). */
+    enterCustomMode(initialCategories: CustomCategory[]): Offer {
+        return this._withGrouping({ mode: 'custom', customCategories: initialCategories.map(c => ({
+            ...c,
+            itemIds: [...c.itemIds]
+        })) });
+    }
+
+    /** Append a new custom category. Throws on validation failure. */
+    addCustomCategory(name: string, opts: { reserved?: readonly string[] } = {}): Offer {
+        const categories = this._customCategories();
+        const existing = categories.map((c) => c.name);
+        const validation = validateCategoryName(name, existing, opts.reserved ?? []);
+        if (!validation.ok) {
+            throw new Error(`Invalid category name: ${validation.reason}`);
+        }
+        const next: CustomCategory = { id: crypto.randomUUID(), name: name.trim(), itemIds: [] };
+        return this._withGrouping({
+            mode: 'custom',
+            customCategories: [...categories, next],
+        });
+    }
+
+    /** Rename a custom category. Throws on validation failure. */
+    renameCustomCategory(id: string, name: string, opts: { reserved?: readonly string[] } = {}): Offer {
+        const categories = this._customCategories();
+        const existing = categories.filter((c) => c.id !== id).map((c) => c.name);
+        const validation = validateCategoryName(name, existing, opts.reserved ?? []);
+        if (!validation.ok) {
+            throw new Error(`Invalid category name: ${validation.reason}`);
+        }
+        return this._withGrouping({
+            mode: 'custom',
+            customCategories: categories.map((c) => c.id === id ? { ...c, name: name.trim() } : c),
+        });
+    }
+
+    removeCustomCategory(id: string): Offer {
+        const categories = this._customCategories();
+        return this._withGrouping({
+            mode: 'custom',
+            customCategories: categories.filter((c) => c.id !== id),
+        });
+    }
+
+    /** Reorder existing categories by id. Unknown ids are ignored; missing ids retain their position at the end. */
+    reorderCustomCategories(orderedIds: string[]): Offer {
+        const categories = this._customCategories();
+        const byId = new Map(categories.map((c) => [c.id, c]));
+        const seen = new Set<string>();
+        const reordered: CustomCategory[] = [];
+
+        for (const id of orderedIds) {
+            const cat = byId.get(id);
+            if (cat && !seen.has(id)) {
+                reordered.push(cat);
+                seen.add(id);
+            }
+        }
+        for (const cat of categories) {
+            if (!seen.has(cat.id)) reordered.push(cat);
+        }
+        return this._withGrouping({ mode: 'custom', customCategories: reordered });
+    }
+
+    /**
+     * Move an item to a category. Pass null to remove from all categories
+     * (item then renders in the synthetic "Other" section).
+     */
+    moveItemToCategory(itemId: string, categoryId: string | null): Offer {
+        const categories = this._customCategories();
+        const stripped = categories.map((c) => ({
+            ...c,
+            itemIds: c.itemIds.filter((id) => id !== itemId),
+        }));
+        const next = categoryId === null
+            ? stripped
+            : stripped.map((c) => c.id === categoryId ? { ...c, itemIds: [...c.itemIds, itemId] } : c);
+        return this._withGrouping({ mode: 'custom', customCategories: next });
+    }
+
+    /**
+     * Drop itemIds in custom categories that no longer reference live items.
+     * Safe to call when not in custom mode (no-op).
+     */
+    normalizeCustomGrouping(): Offer {
+        const grouping = this._grouping();
+        if (grouping?.mode !== 'custom' || !grouping.customCategories) return this;
+        const liveIds = new Set(this.items.map((i) => i.id));
+        const normalized = normalizeCustomGrouping(grouping.customCategories, liveIds);
+        if (normalized === grouping.customCategories) return this;
+        return this._withGrouping({ ...grouping, customCategories: normalized });
     }
 
     /**

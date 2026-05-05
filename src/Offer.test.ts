@@ -248,8 +248,148 @@ describe('Real Offer Data', () => {
     it('should set glass price and round it', () => {
         let updated = baseOffer.setGlassPrice(12.34);
         updated = updated.roundGlassPrices(0.5);
-        
+
         const item = updated.items[0];
         expect(item?.glassPrice).toBe(12.5);
+    });
+});
+
+describe('Grouping', () => {
+    const buildOffer = () => new Offer({
+        items: [
+            new OfferItem({ price: 10, id: 'i1' }),
+            new OfferItem({ price: 10, id: 'i2' }),
+            new OfferItem({ price: 10, id: 'i3' }),
+        ],
+    });
+
+    it('setGrouping writes to data.grouping immutably', () => {
+        const offer = buildOffer();
+        const next = offer.setGrouping({ mode: 'country' });
+        expect(next).not.toBe(offer);
+        expect(next.data['grouping']).toEqual({ mode: 'country' });
+        expect(offer.data['grouping']).toBeUndefined();
+    });
+
+    it('setGrouping(null) clears the field', () => {
+        const offer = buildOffer().setGrouping({ mode: 'country' });
+        const cleared = offer.setGrouping(null);
+        expect(cleared.data['grouping']).toBeUndefined();
+    });
+
+    it('enterCustomMode seeds custom categories', () => {
+        const offer = buildOffer();
+        const seed = [{ id: 'c1', name: 'A', itemIds: ['i1'] }];
+        const next = offer.enterCustomMode(seed);
+        expect(next.data['grouping']).toEqual({
+            mode: 'custom',
+            customCategories: [{ id: 'c1', name: 'A', itemIds: ['i1'] }],
+        });
+    });
+
+    it('addCustomCategory throws on empty / duplicate / reserved name', () => {
+        const offer = buildOffer().enterCustomMode([{ id: 'c1', name: 'Existing', itemIds: [] }]);
+        expect(() => offer.addCustomCategory('')).toThrow(/empty/);
+        expect(() => offer.addCustomCategory('existing')).toThrow(/duplicate/);
+        expect(() => offer.addCustomCategory('Other', { reserved: ['Other'] })).toThrow(/reserved/);
+    });
+
+    it('addCustomCategory appends a new category with a fresh id', () => {
+        const offer = buildOffer().enterCustomMode([]);
+        const next = offer.addCustomCategory('French');
+        const cats = next.data['grouping'].customCategories;
+        expect(cats.length).toBe(1);
+        expect(cats[0].name).toBe('French');
+        expect(cats[0].itemIds).toEqual([]);
+        expect(typeof cats[0].id).toBe('string');
+    });
+
+    it('renameCustomCategory updates the name; allows same name on same id', () => {
+        const offer = buildOffer().enterCustomMode([
+            { id: 'c1', name: 'A', itemIds: [] },
+            { id: 'c2', name: 'B', itemIds: [] },
+        ]);
+        const renamed = offer.renameCustomCategory('c1', 'C');
+        const cats = renamed.data['grouping'].customCategories;
+        expect(cats.find((c: any) => c.id === 'c1').name).toBe('C');
+
+        // No-op rename to itself should succeed
+        expect(() => renamed.renameCustomCategory('c1', 'C')).not.toThrow();
+        // Renaming to another category's name should fail
+        expect(() => renamed.renameCustomCategory('c1', 'B')).toThrow(/duplicate/);
+    });
+
+    it('removeCustomCategory drops the category', () => {
+        const offer = buildOffer().enterCustomMode([
+            { id: 'c1', name: 'A', itemIds: ['i1'] },
+            { id: 'c2', name: 'B', itemIds: [] },
+        ]);
+        const next = offer.removeCustomCategory('c1');
+        const cats = next.data['grouping'].customCategories;
+        expect(cats.length).toBe(1);
+        expect(cats[0].id).toBe('c2');
+    });
+
+    it('reorderCustomCategories reorders by id and keeps unknown / missing ids stable', () => {
+        const offer = buildOffer().enterCustomMode([
+            { id: 'c1', name: 'A', itemIds: [] },
+            { id: 'c2', name: 'B', itemIds: [] },
+            { id: 'c3', name: 'C', itemIds: [] },
+        ]);
+        const reordered = offer.reorderCustomCategories(['c3', 'c1']);
+        const cats = reordered.data['grouping'].customCategories;
+        expect(cats.map((c: any) => c.id)).toEqual(['c3', 'c1', 'c2']);
+    });
+
+    it('moveItemToCategory moves an item across categories', () => {
+        const offer = buildOffer().enterCustomMode([
+            { id: 'c1', name: 'A', itemIds: ['i1', 'i2'] },
+            { id: 'c2', name: 'B', itemIds: ['i3'] },
+        ]);
+        const moved = offer.moveItemToCategory('i1', 'c2');
+        const cats = moved.data['grouping'].customCategories;
+        expect(cats.find((c: any) => c.id === 'c1').itemIds).toEqual(['i2']);
+        expect(cats.find((c: any) => c.id === 'c2').itemIds).toEqual(['i3', 'i1']);
+    });
+
+    it('moveItemToCategory(itemId, null) removes from all categories', () => {
+        const offer = buildOffer().enterCustomMode([
+            { id: 'c1', name: 'A', itemIds: ['i1'] },
+            { id: 'c2', name: 'B', itemIds: ['i2'] },
+        ]);
+        const moved = offer.moveItemToCategory('i1', null);
+        const cats = moved.data['grouping'].customCategories;
+        expect(cats.flatMap((c: any) => c.itemIds)).toEqual(['i2']);
+    });
+
+    it('normalizeCustomGrouping is a no-op when not in custom mode', () => {
+        const offer = buildOffer().setGrouping({ mode: 'type' });
+        expect(offer.normalizeCustomGrouping()).toBe(offer);
+    });
+
+    it('normalizeCustomGrouping drops dead itemIds when in custom mode', () => {
+        const offer = buildOffer().enterCustomMode([
+            { id: 'c1', name: 'A', itemIds: ['i1', 'gone'] },
+            { id: 'c2', name: 'B', itemIds: ['i3'] },
+        ]);
+        const normalized = offer.normalizeCustomGrouping();
+        const cats = normalized.data['grouping'].customCategories;
+        expect(cats.find((c: any) => c.id === 'c1').itemIds).toEqual(['i1']);
+        expect(cats.find((c: any) => c.id === 'c2').itemIds).toEqual(['i3']);
+    });
+
+    it('normalizeCustomGrouping returns the same Offer when nothing changed', () => {
+        const offer = buildOffer().enterCustomMode([
+            { id: 'c1', name: 'A', itemIds: ['i1'] },
+        ]);
+        expect(offer.normalizeCustomGrouping()).toBe(offer);
+    });
+
+    it('grouping mutations preserve other offer state (items, title, totals)', () => {
+        const offer = buildOffer().updateTitle('My offer');
+        const next = offer.setGrouping({ mode: 'country' });
+        expect(next.title).toBe('My offer');
+        expect(next.items.length).toBe(3);
+        expect(next.totals).toEqual(offer.totals);
     });
 });
