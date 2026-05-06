@@ -257,6 +257,12 @@ declare function matchesRules(item: OfferItem, rules: FilterRule[]): boolean;
 /**
  * Detect the canonical wine-type bucket for an item.
  * Returns null when no key matches (consumer routes to OTHER_SECTION_VALUE).
+ *
+ * Accepts three real-world input shapes on `item.data`:
+ *   - `type: string`          — legacy/normalized form
+ *   - `type: string[]`        — catalog wines (Qdrant search results)
+ *   - `wine_type: string`     — wine-card items (parsed from menu uploads),
+ *                               used as a fallback when `type` is absent
  */
 declare function detectWineType(item: OfferItem): WineTypeKey | null;
 
