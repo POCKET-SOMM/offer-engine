@@ -1,6 +1,8 @@
 export { Offer } from './Offer.js';
 export { OfferItem } from './OfferItem.js';
-export type { PourVolume, ItemConfig } from './types.js';
+export { OFFER_STATUSES, DEFAULT_OFFER_STATUS } from './constants.js';
+export type { OfferStatus } from './constants.js';
+export type { PourVolume, ItemConfig, OfferSummary, OfferThumbnail } from './types.js';
 
 // Grouping
 export { groupItems } from './grouping/groupItems.js';

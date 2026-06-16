@@ -7,3 +7,14 @@ export const UNIT_MULTIPLIERS: Record<string, number> = {
     CASE_12: 12,
     CASE_24: 24,
 };
+
+// --- Offer lifecycle status ---
+// A manual lifecycle the consumer sets via Offer.setStatus(). Stored on the
+// offer.data bag (like grouping), and surfaced by toSummary()/toJSON().summary.
+export const OFFER_STATUSES = ['draft', 'sent', 'accepted'] as const;
+export type OfferStatus = (typeof OFFER_STATUSES)[number];
+export const DEFAULT_OFFER_STATUS: OfferStatus = 'draft';
+
+// How many leading items toSummary() includes as thumbnails — a compact preview
+// for offer-list rows, not the full item set.
+export const SUMMARY_THUMBNAIL_LIMIT = 8;

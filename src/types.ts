@@ -1,7 +1,23 @@
+import type { OfferStatus } from './constants.js';
+
 export interface PourVolume {
     volume: number;      // ml, primary key (unique per item)
     price: number;       // price for this pour
     name?: string;       // optional display label (e.g. "Medium")
+}
+
+export interface OfferThumbnail {
+    imgUrl?: string;
+    title?: string;
+}
+
+// Compact, denormalized projection of an Offer for list views. Embedded into
+// toJSON() so a stored offer carries its own brief representation (thumbnails +
+// count + status) without consumers having to load every item.
+export interface OfferSummary {
+    thumbnails: OfferThumbnail[];
+    wineCount: number;
+    status: OfferStatus;
 }
 
 export interface ItemConfig {

@@ -21,6 +21,25 @@ A collection of `OfferItem`s with aggregated totals.
 - **Bulk Operations**: `setMargin`, `setGross`, `setDiscount`, `setQuantity`, `setVatRate`, `setGlassPrice`, `setUnit`.
 - **Totals**: Provides `totalNet`, `totalVat`, and `totalGross` for the entire offer.
 - **Updates**: Individual item updates via `updateItem(id, fields|fn)`.
+- **Status**: `offer.status` (getter, defaults to `'draft'`) and `setStatus(status)`. Valid values:
+  `OFFER_STATUSES` (`'draft' | 'sent' | 'accepted'`, type `OfferStatus`).
+
+### Convention: the `data` bag (`offer.data` / `item.data`)
+Both `Offer` and `OfferItem` carry a free-form `data: Record<string, any>` that the constructor
+preserves verbatim across every immutable operation. It's the home for consumer-owned, non-financial
+fields the engine doesn't model — so a feature can be added **without** widening the typed config.
+- The engine itself uses it for `data.grouping` (see `setGrouping`/custom categories) and `data.status`.
+- Consumer apps store their own keys here too (e.g. `data.documents`). Write via the
+  constructor-spread pattern: `new Offer({ ...offer, data: { ...offer.data, myField } })`.
+- `OfferItem.data` holds the original wine object (`imgUrl`, `title`, region, etc.).
+
+### Convention: `toSummary()` and `toJSON().summary`
+`toSummary()` returns a compact `OfferSummary` — `{ thumbnails: {imgUrl,title}[] (first 8 items),
+wineCount, status }` — for list/index views that shouldn't load every item. `toJSON()` embeds it as
+`summary`, a **top-level sibling of `items`/`totals`** (not nested under `data`). Because it's part of
+`toJSON()`, it's recomputed on every serialization and can't drift. The save envelope is
+`{ data: offer.toJSON() }`, so a list endpoint surfaces the brief payload by reading
+`record.data.summary`; the status lives one level deeper at `record.data.data.status`.
 
 ## Usage for Agents
 - Always use the `update` methods rather than creating new objects from scratch if you want to preserve the "lock" on explicit targets.

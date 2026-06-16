@@ -1,6 +1,12 @@
-import { UNIT_MULTIPLIERS } from './constants.js';
+import {
+    UNIT_MULTIPLIERS,
+    OFFER_STATUSES,
+    DEFAULT_OFFER_STATUS,
+    SUMMARY_THUMBNAIL_LIMIT,
+    type OfferStatus,
+} from './constants.js';
 import { OfferItem } from './OfferItem.js';
-import type { ItemConfig, OfferTotals, PourVolume } from './types.js';
+import type { ItemConfig, OfferTotals, PourVolume, OfferSummary } from './types.js';
 import { round } from './utils/math.js';
 import { normalizeCustomGrouping, validateCategoryName } from './grouping/normalize.js';
 import type { CustomCategory, GroupingConfig } from './grouping/types.js';
@@ -65,6 +71,23 @@ export class Offer {
 
     setMenu(menu: any): Offer {
         return new Offer({ ...this, menu });
+    }
+
+    // --- Status ---
+    // A manual lifecycle stored on the data bag (like grouping), so it survives a
+    // toJSON()/new Offer() round-trip without a dedicated config field.
+
+    /** Manual lifecycle status. Defaults to 'draft' when unset. */
+    get status(): OfferStatus {
+        return (this.data?.['status'] as OfferStatus) ?? DEFAULT_OFFER_STATUS;
+    }
+
+    /** Set the manual lifecycle status immutably. Throws on an unknown value. */
+    setStatus(status: OfferStatus): Offer {
+        if (!OFFER_STATUSES.includes(status)) {
+            throw new Error(`Invalid offer status: ${status}`);
+        }
+        return new Offer({ ...this, data: { ...this.data, status } });
     }
 
     /**
@@ -318,7 +341,28 @@ export class Offer {
     }
 
     /**
-     * Serialize for API storage
+     * Compact projection for list views: a capped thumbnail preview, the total
+     * wine count, and the lifecycle status. Embedded into toJSON().summary so a
+     * stored offer carries its own brief representation — list endpoints can
+     * surface `summary` without loading every item.
+     */
+    toSummary(): OfferSummary {
+        return {
+            thumbnails: this.items
+                .slice(0, SUMMARY_THUMBNAIL_LIMIT)
+                .map(item => ({
+                    imgUrl: item.data?.['imgUrl'],
+                    title: item.data?.['title'],
+                })),
+            wineCount: this.items.length,
+            status: this.status,
+        };
+    }
+
+    /**
+     * Serialize for API storage. `summary` is a top-level sibling of `items`
+     * (not nested in `data`) so consumers projecting a brief list payload read
+     * it straight off the stored record.
      */
     toJSON() {
         return {
@@ -327,7 +371,8 @@ export class Offer {
             menu: this.menu,
             items: this.items.map(item => item.toJSON()),
             totals: this.totals,
-            data: this.data
+            data: this.data,
+            summary: this.toSummary(),
         };
     }
 }

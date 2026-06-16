@@ -393,3 +393,82 @@ describe('Grouping', () => {
         expect(next.totals).toEqual(offer.totals);
     });
 });
+
+describe('Status', () => {
+    const buildOffer = () => new Offer({
+        items: [
+            new OfferItem({ price: 10, id: 'i1', data: { imgUrl: 'a.png', title: 'Wine A' } }),
+            new OfferItem({ price: 10, id: 'i2', data: { imgUrl: 'b.png', title: 'Wine B' } }),
+        ],
+    });
+
+    it('defaults to draft', () => {
+        expect(new Offer().status).toBe('draft');
+    });
+
+    it('setStatus writes to data.status immutably', () => {
+        const offer = buildOffer();
+        const next = offer.setStatus('sent');
+        expect(next).not.toBe(offer);
+        expect(next.status).toBe('sent');
+        expect(next.data['status']).toBe('sent');
+        expect(offer.status).toBe('draft');
+    });
+
+    it('setStatus throws on an unknown value', () => {
+        expect(() => new Offer().setStatus('archived' as any)).toThrow(/Invalid offer status/);
+    });
+
+    it('status round-trips through toJSON / new Offer', () => {
+        const json = buildOffer().setStatus('accepted').toJSON();
+        const restored = new Offer({ ...json, items: json.items.map(i => new OfferItem(i)) });
+        expect(restored.status).toBe('accepted');
+    });
+
+    it('setStatus preserves items, title and grouping', () => {
+        const offer = buildOffer().updateTitle('My offer').setGrouping({ mode: 'country' });
+        const next = offer.setStatus('sent');
+        expect(next.title).toBe('My offer');
+        expect(next.items.length).toBe(2);
+        expect(next.data['grouping']).toEqual({ mode: 'country' });
+    });
+});
+
+describe('Summary', () => {
+    it('derives thumbnails, wineCount and status', () => {
+        const offer = new Offer({
+            items: [
+                new OfferItem({ price: 10, id: 'i1', data: { imgUrl: 'a.png', title: 'Wine A' } }),
+                new OfferItem({ price: 10, id: 'i2', data: { imgUrl: 'b.png', title: 'Wine B' } }),
+            ],
+        }).setStatus('sent');
+
+        expect(offer.toSummary()).toEqual({
+            thumbnails: [
+                { imgUrl: 'a.png', title: 'Wine A' },
+                { imgUrl: 'b.png', title: 'Wine B' },
+            ],
+            wineCount: 2,
+            status: 'sent',
+        });
+    });
+
+    it('caps thumbnails at the limit but reports the full wineCount', () => {
+        const items = Array.from({ length: 12 }, (_, i) =>
+            new OfferItem({ price: 10, id: `i${i}`, data: { imgUrl: `${i}.png`, title: `Wine ${i}` } }));
+        const summary = new Offer({ items }).toSummary();
+        expect(summary.thumbnails.length).toBe(8);
+        expect(summary.wineCount).toBe(12);
+    });
+
+    it('toJSON embeds the summary as a top-level sibling of items', () => {
+        const json = new Offer({
+            items: [new OfferItem({ price: 10, id: 'i1', data: { imgUrl: 'a.png', title: 'Wine A' } })],
+        }).toJSON();
+        expect(json.summary).toEqual({
+            thumbnails: [{ imgUrl: 'a.png', title: 'Wine A' }],
+            wineCount: 1,
+            status: 'draft',
+        });
+    });
+});

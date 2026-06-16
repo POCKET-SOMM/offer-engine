@@ -1,7 +1,20 @@
+declare const OFFER_STATUSES: readonly ["draft", "sent", "accepted"];
+type OfferStatus = (typeof OFFER_STATUSES)[number];
+declare const DEFAULT_OFFER_STATUS: OfferStatus;
+
 interface PourVolume {
     volume: number;
     price: number;
     name?: string;
+}
+interface OfferThumbnail {
+    imgUrl?: string;
+    title?: string;
+}
+interface OfferSummary {
+    thumbnails: OfferThumbnail[];
+    wineCount: number;
+    status: OfferStatus;
 }
 interface ItemConfig {
     price: number;
@@ -144,6 +157,10 @@ declare class Offer {
     private _getMultiplier;
     updateTitle(title: string): Offer;
     setMenu(menu: any): Offer;
+    /** Manual lifecycle status. Defaults to 'draft' when unset. */
+    get status(): OfferStatus;
+    /** Set the manual lifecycle status immutably. Throws on an unknown value. */
+    setStatus(status: OfferStatus): Offer;
     /**
      * Add items to the offer.
      * Converts raw data to OfferItem instances automatically.
@@ -206,7 +223,16 @@ declare class Offer {
      */
     normalizeCustomGrouping(): Offer;
     /**
-     * Serialize for API storage
+     * Compact projection for list views: a capped thumbnail preview, the total
+     * wine count, and the lifecycle status. Embedded into toJSON().summary so a
+     * stored offer carries its own brief representation — list endpoints can
+     * surface `summary` without loading every item.
+     */
+    toSummary(): OfferSummary;
+    /**
+     * Serialize for API storage. `summary` is a top-level sibling of `items`
+     * (not nested in `data`) so consumers projecting a brief list payload read
+     * it straight off the stored record.
      */
     toJSON(): {
         id: string;
@@ -234,6 +260,7 @@ declare class Offer {
         }[];
         totals: OfferTotals;
         data: Record<string, any>;
+        summary: OfferSummary;
     };
 }
 
@@ -286,4 +313,4 @@ type CategoryNameValidation = {
  */
 declare function validateCategoryName(name: string, existing: readonly string[], reserved: readonly string[]): CategoryNameValidation;
 
-export { type CategoryNameValidation, type CustomCategory, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, OTHER_SECTION_VALUE, Offer, OfferItem, type PourVolume, STRATEGY_MISSING_VALUE, type SavedStrategy, type StrategyCategory, WINE_TYPE_KEYS, type WineTypeKey, detectWineType, groupItems, matchesRules, normalizeCustomGrouping, validateCategoryName };
+export { type CategoryNameValidation, type CustomCategory, DEFAULT_OFFER_STATUS, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferStatus, type OfferSummary, type OfferThumbnail, type PourVolume, STRATEGY_MISSING_VALUE, type SavedStrategy, type StrategyCategory, WINE_TYPE_KEYS, type WineTypeKey, detectWineType, groupItems, matchesRules, normalizeCustomGrouping, validateCategoryName };
