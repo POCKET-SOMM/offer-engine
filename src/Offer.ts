@@ -3,13 +3,16 @@ import {
     OFFER_STATUSES,
     DEFAULT_OFFER_STATUS,
     SUMMARY_THUMBNAIL_LIMIT,
+    SUMMARY_GROUP_THUMBNAIL_LIMIT,
     type OfferStatus,
 } from './constants.js';
 import { OfferItem } from './OfferItem.js';
-import type { ItemConfig, OfferTotals, PourVolume, OfferSummary } from './types.js';
+import type { ItemConfig, OfferTotals, PourVolume, OfferSummary, OfferSummaryGroup, OfferThumbnail } from './types.js';
 import { round } from './utils/math.js';
 import { normalizeCustomGrouping, validateCategoryName } from './grouping/normalize.js';
-import type { CustomCategory, GroupingConfig } from './grouping/types.js';
+import { groupItems } from './grouping/groupItems.js';
+import type { CustomCategory, GroupingConfig, GroupingMode } from './grouping/types.js';
+import { sortItems, type SortConfig } from './sorting/sortItems.js';
 
 export interface OfferConfig {
     id?: string;
@@ -246,6 +249,33 @@ export class Offer {
         return this._withGrouping(grouping);
     }
 
+    // --- Sorting ---
+    // Like grouping, the sort lives on the `data` bag so it round-trips through
+    // toJSON()/new Offer() and persists with the offer instead of being a
+    // consumer-side, per-session view preference.
+
+    /** The offer's saved item ordering, if one has been set. */
+    get sort(): SortConfig | undefined {
+        return this.data?.['sort'] as SortConfig | undefined;
+    }
+
+    /** Replace (or clear) the sort config on offer.data. */
+    setSort(sort: SortConfig | null): Offer {
+        const nextData = { ...this.data };
+        if (!sort) {
+            delete nextData['sort'];
+        } else {
+            nextData['sort'] = { field: sort.field, dir: sort.dir };
+        }
+        return new Offer({ ...this, data: nextData });
+    }
+
+    /** Items in the offer's saved sort order — insertion order when unset. */
+    get sortedItems(): readonly OfferItem[] {
+        const sort = this.sort;
+        return sort ? sortItems(this.items, sort) : this.items;
+    }
+
     /** Switch to custom mode, seeding with the provided categories (snapshot from current grouping). */
     enterCustomMode(initialCategories: CustomCategory[]): Offer {
         return this._withGrouping({ mode: 'custom', customCategories: initialCategories.map(c => ({
@@ -341,19 +371,51 @@ export class Offer {
     }
 
     /**
-     * Compact projection for list views: a capped thumbnail preview, the total
-     * wine count, and the lifecycle status. Embedded into toJSON().summary so a
+     * Compact projection for list views: a flat capped thumbnail preview, the
+     * same wines grouped the way the offer itself is grouped, the total wine
+     * count, and the lifecycle status. Embedded into toJSON().summary so a
      * stored offer carries its own brief representation — list endpoints can
      * surface `summary` without loading every item.
+     *
+     * Item order follows the offer's saved `sort` (insertion order when unset).
+     *
+     * NOTE: `strategy` grouping is previewed as `type`. A saved strategy's
+     * definition (its categories and filter rules) lives in the consumer app,
+     * not on the offer, so it cannot be resolved here. Manual (`custom`)
+     * grouping is fully self-contained and IS honoured.
      */
     toSummary(): OfferSummary {
+        const toThumb = (item: OfferItem): OfferThumbnail => ({
+            imgUrl: item.data?.['imgUrl'],
+            title: item.data?.['title'],
+        });
+
+        const ordered = this.sortedItems;
+        const configured = this._grouping();
+        const mode: GroupingMode =
+            configured?.mode && configured.mode !== 'strategy' ? configured.mode : 'type';
+        const grouping: GroupingConfig = mode === 'custom'
+            ? { mode: 'custom', customCategories: configured?.customCategories ?? [] }
+            : { mode };
+
+        const groups: OfferSummaryGroup[] = groupItems(ordered, grouping)
+            .filter((section) => section.items.length > 0)
+            .map((section) => {
+                const label = section.custom?.name;
+                return {
+                    value: section.value,
+                    ...(label ? { label } : {}),
+                    count: section.items.length,
+                    thumbnails: section.items
+                        .slice(0, SUMMARY_GROUP_THUMBNAIL_LIMIT)
+                        .map(toThumb),
+                };
+            });
+
         return {
-            thumbnails: this.items
-                .slice(0, SUMMARY_THUMBNAIL_LIMIT)
-                .map(item => ({
-                    imgUrl: item.data?.['imgUrl'],
-                    title: item.data?.['title'],
-                })),
+            thumbnails: ordered.slice(0, SUMMARY_THUMBNAIL_LIMIT).map(toThumb),
+            groups,
+            groupingMode: mode,
             wineCount: this.items.length,
             status: this.status,
         };

@@ -1,8 +1,17 @@
 export { Offer } from './Offer.js';
 export { OfferItem } from './OfferItem.js';
-export { OFFER_STATUSES, DEFAULT_OFFER_STATUS } from './constants.js';
+export {
+    OFFER_STATUSES,
+    DEFAULT_OFFER_STATUS,
+    SUMMARY_THUMBNAIL_LIMIT,
+    SUMMARY_GROUP_THUMBNAIL_LIMIT,
+} from './constants.js';
 export type { OfferStatus } from './constants.js';
-export type { PourVolume, ItemConfig, OfferSummary, OfferThumbnail } from './types.js';
+export type { PourVolume, ItemConfig, OfferSummary, OfferSummaryGroup, OfferThumbnail } from './types.js';
+
+// Sorting
+export { sortItems, DEFAULT_SORT } from './sorting/sortItems.js';
+export type { SortConfig, SortField, SortDirection } from './sorting/sortItems.js';
 
 // Grouping
 export { groupItems } from './grouping/groupItems.js';

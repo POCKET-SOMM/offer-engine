@@ -1,6 +1,50 @@
 declare const OFFER_STATUSES: readonly ["draft", "sent", "accepted"];
 type OfferStatus = (typeof OFFER_STATUSES)[number];
 declare const DEFAULT_OFFER_STATUS: OfferStatus;
+declare const SUMMARY_THUMBNAIL_LIMIT = 8;
+declare const SUMMARY_GROUP_THUMBNAIL_LIMIT = 3;
+
+type GroupingMode = 'type' | 'country' | 'strategy' | 'custom';
+interface FilterRule {
+    type: string;
+    key?: string | number | undefined;
+    exclude?: boolean | undefined;
+    range?: [number | null, number | null] | undefined;
+}
+interface CustomCategory {
+    id: string;
+    name: string;
+    itemIds: string[];
+}
+interface StrategyCategory {
+    id: string;
+    name: string;
+    filters: FilterRule[];
+}
+interface SavedStrategy {
+    id: string;
+    name: string;
+    categories: StrategyCategory[];
+}
+interface GroupingConfig {
+    mode: GroupingMode;
+    strategyId?: string | undefined;
+    customCategories?: CustomCategory[] | undefined;
+}
+interface GroupedSection {
+    value: string;
+    items: readonly OfferItem[];
+    isOther?: boolean;
+    isCustom?: boolean;
+    custom?: CustomCategory;
+    strategyCategory?: StrategyCategory;
+    strategyMissing?: boolean;
+}
+declare const OTHER_SECTION_VALUE = "__other__";
+declare const STRATEGY_MISSING_VALUE = "__strategy_missing__";
+/** Rendering order for built-in 'type' mode. */
+declare const WINE_TYPE_KEYS: readonly ["sparkling", "white", "rose", "red", "fortified", "dessert"];
+type WineTypeKey = typeof WINE_TYPE_KEYS[number];
 
 interface PourVolume {
     volume: number;
@@ -11,8 +55,21 @@ interface OfferThumbnail {
     imgUrl?: string;
     title?: string;
 }
+interface OfferSummaryGroup {
+    value: string;
+    /** Display name for custom categories; absent for built-in type/country
+     *  groups, whose `value` is a key the consumer localizes itself. */
+    label?: string;
+    count: number;
+    thumbnails: OfferThumbnail[];
+}
 interface OfferSummary {
     thumbnails: OfferThumbnail[];
+    /** Grouped preview reflecting the offer's own grouping config. */
+    groups: OfferSummaryGroup[];
+    /** The mode `groups` was built with — 'type' when grouping is unset or is a
+     *  strategy (see Offer.toSummary). */
+    groupingMode: GroupingMode;
     wineCount: number;
     status: OfferStatus;
 }
@@ -96,47 +153,21 @@ declare class OfferItem {
     static fromWine(wine: any, overrides?: Partial<ItemConfig>): OfferItem;
 }
 
-type GroupingMode = 'type' | 'country' | 'strategy' | 'custom';
-interface FilterRule {
-    type: string;
-    key?: string | number | undefined;
-    exclude?: boolean | undefined;
-    range?: [number | null, number | null] | undefined;
+/** Fields an offer's items can be ordered by. */
+type SortField = 'name' | 'price' | 'quantity' | 'vintage';
+type SortDirection = 'asc' | 'desc';
+/** The whole sort state: what we order by, and in which direction. */
+interface SortConfig {
+    field: SortField;
+    dir: SortDirection;
 }
-interface CustomCategory {
-    id: string;
-    name: string;
-    itemIds: string[];
-}
-interface StrategyCategory {
-    id: string;
-    name: string;
-    filters: FilterRule[];
-}
-interface SavedStrategy {
-    id: string;
-    name: string;
-    categories: StrategyCategory[];
-}
-interface GroupingConfig {
-    mode: GroupingMode;
-    strategyId?: string | undefined;
-    customCategories?: CustomCategory[] | undefined;
-}
-interface GroupedSection {
-    value: string;
-    items: readonly OfferItem[];
-    isOther?: boolean;
-    isCustom?: boolean;
-    custom?: CustomCategory;
-    strategyCategory?: StrategyCategory;
-    strategyMissing?: boolean;
-}
-declare const OTHER_SECTION_VALUE = "__other__";
-declare const STRATEGY_MISSING_VALUE = "__strategy_missing__";
-/** Rendering order for built-in 'type' mode. */
-declare const WINE_TYPE_KEYS: readonly ["sparkling", "white", "rose", "red", "fortified", "dessert"];
-type WineTypeKey = typeof WINE_TYPE_KEYS[number];
+declare const DEFAULT_SORT: SortConfig;
+/**
+ * Pure, stable-ish ordering of offer items. Never mutates the input — always
+ * returns a new array. An unknown field is a no-op (items are returned in their
+ * existing order) so a stale persisted sort can never throw or drop items.
+ */
+declare function sortItems(items?: readonly OfferItem[], sort?: SortConfig): OfferItem[];
 
 interface OfferConfig {
     id?: string;
@@ -199,6 +230,12 @@ declare class Offer {
     private _customCategories;
     /** Replace (or clear) the grouping config on offer.data. */
     setGrouping(grouping: GroupingConfig | null): Offer;
+    /** The offer's saved item ordering, if one has been set. */
+    get sort(): SortConfig | undefined;
+    /** Replace (or clear) the sort config on offer.data. */
+    setSort(sort: SortConfig | null): Offer;
+    /** Items in the offer's saved sort order — insertion order when unset. */
+    get sortedItems(): readonly OfferItem[];
     /** Switch to custom mode, seeding with the provided categories (snapshot from current grouping). */
     enterCustomMode(initialCategories: CustomCategory[]): Offer;
     /** Append a new custom category. Throws on validation failure. */
@@ -223,10 +260,18 @@ declare class Offer {
      */
     normalizeCustomGrouping(): Offer;
     /**
-     * Compact projection for list views: a capped thumbnail preview, the total
-     * wine count, and the lifecycle status. Embedded into toJSON().summary so a
+     * Compact projection for list views: a flat capped thumbnail preview, the
+     * same wines grouped the way the offer itself is grouped, the total wine
+     * count, and the lifecycle status. Embedded into toJSON().summary so a
      * stored offer carries its own brief representation — list endpoints can
      * surface `summary` without loading every item.
+     *
+     * Item order follows the offer's saved `sort` (insertion order when unset).
+     *
+     * NOTE: `strategy` grouping is previewed as `type`. A saved strategy's
+     * definition (its categories and filter rules) lives in the consumer app,
+     * not on the offer, so it cannot be resolved here. Manual (`custom`)
+     * grouping is fully self-contained and IS honoured.
      */
     toSummary(): OfferSummary;
     /**
@@ -313,4 +358,4 @@ type CategoryNameValidation = {
  */
 declare function validateCategoryName(name: string, existing: readonly string[], reserved: readonly string[]): CategoryNameValidation;
 
-export { type CategoryNameValidation, type CustomCategory, DEFAULT_OFFER_STATUS, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferStatus, type OfferSummary, type OfferThumbnail, type PourVolume, STRATEGY_MISSING_VALUE, type SavedStrategy, type StrategyCategory, WINE_TYPE_KEYS, type WineTypeKey, detectWineType, groupItems, matchesRules, normalizeCustomGrouping, validateCategoryName };
+export { type CategoryNameValidation, type CustomCategory, DEFAULT_OFFER_STATUS, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, type PourVolume, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, WINE_TYPE_KEYS, type WineTypeKey, detectWineType, groupItems, matchesRules, normalizeCustomGrouping, sortItems, validateCategoryName };

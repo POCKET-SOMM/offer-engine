@@ -435,40 +435,160 @@ describe('Status', () => {
 });
 
 describe('Summary', () => {
-    it('derives thumbnails, wineCount and status', () => {
+    const wine = (id: string, price: number, extra: Record<string, any> = {}) =>
+        new OfferItem({ price, id, data: { imgUrl: `${id}.png`, title: `Wine ${id}`, ...extra } });
+
+    it('derives thumbnails, groups, wineCount and status', () => {
         const offer = new Offer({
-            items: [
-                new OfferItem({ price: 10, id: 'i1', data: { imgUrl: 'a.png', title: 'Wine A' } }),
-                new OfferItem({ price: 10, id: 'i2', data: { imgUrl: 'b.png', title: 'Wine B' } }),
-            ],
+            items: [wine('a', 10, { type: 'white' }), wine('b', 10, { type: 'red' })],
         }).setStatus('sent');
 
+        // Sections follow WINE_TYPE_KEYS order, so white precedes red.
         expect(offer.toSummary()).toEqual({
             thumbnails: [
-                { imgUrl: 'a.png', title: 'Wine A' },
-                { imgUrl: 'b.png', title: 'Wine B' },
+                { imgUrl: 'a.png', title: 'Wine a' },
+                { imgUrl: 'b.png', title: 'Wine b' },
             ],
+            groups: [
+                { value: 'white', count: 1, thumbnails: [{ imgUrl: 'a.png', title: 'Wine a' }] },
+                { value: 'red', count: 1, thumbnails: [{ imgUrl: 'b.png', title: 'Wine b' }] },
+            ],
+            groupingMode: 'type',
             wineCount: 2,
             status: 'sent',
         });
     });
 
     it('caps thumbnails at the limit but reports the full wineCount', () => {
-        const items = Array.from({ length: 12 }, (_, i) =>
-            new OfferItem({ price: 10, id: `i${i}`, data: { imgUrl: `${i}.png`, title: `Wine ${i}` } }));
+        const items = Array.from({ length: 12 }, (_, i) => wine(`i${i}`, 10));
         const summary = new Offer({ items }).toSummary();
         expect(summary.thumbnails.length).toBe(8);
         expect(summary.wineCount).toBe(12);
     });
 
+    it('caps each group at 3 thumbnails but reports the group true count', () => {
+        const items = Array.from({ length: 5 }, (_, i) => wine(`r${i}`, 10, { type: 'red' }));
+        const [group] = new Offer({ items }).toSummary().groups;
+        expect(group!.value).toBe('red');
+        expect(group!.count).toBe(5);
+        expect(group!.thumbnails).toHaveLength(3);
+    });
+
+    it('honours manual (custom) grouping, including its labels', () => {
+        const offer = new Offer({ items: [wine('i1', 10), wine('i2', 10), wine('i3', 10)] })
+            .setGrouping({
+                mode: 'custom',
+                customCategories: [
+                    { id: 'c1', name: 'Starters', itemIds: ['i1', 'i2'] },
+                    { id: 'c2', name: 'Mains', itemIds: ['i3'] },
+                ],
+            });
+
+        const summary = offer.toSummary();
+        expect(summary.groupingMode).toBe('custom');
+        expect(summary.groups.map((g) => [g.value, g.label, g.count])).toEqual([
+            ['c1', 'Starters', 2],
+            ['c2', 'Mains', 1],
+        ]);
+    });
+
+    it('routes unclaimed wines to an Other group in custom mode', () => {
+        const offer = new Offer({ items: [wine('i1', 10), wine('i2', 10)] })
+            .setGrouping({
+                mode: 'custom',
+                customCategories: [{ id: 'c1', name: 'Picked', itemIds: ['i1'] }],
+            });
+
+        expect(offer.toSummary().groups.map((g) => [g.value, g.count])).toEqual([
+            ['c1', 1],
+            ['__other__', 1],
+        ]);
+    });
+
+    it('previews strategy grouping as type — strategies live in the consumer app', () => {
+        const offer = new Offer({ items: [wine('a', 10, { type: 'white' }), wine('b', 10, { type: 'red' })] })
+            .setGrouping({ mode: 'strategy', strategyId: 'not-resolvable-here' });
+
+        const summary = offer.toSummary();
+        expect(summary.groupingMode).toBe('type');
+        expect(summary.groups.map((g) => g.value)).toEqual(['white', 'red']);
+    });
+
+    it('groups untyped wines under Other', () => {
+        const summary = new Offer({ items: [wine('x', 10)] }).toSummary();
+        expect(summary.groups.map((g) => [g.value, g.count])).toEqual([['__other__', 1]]);
+    });
+
+    it('orders the preview by the offer saved sort', () => {
+        const offer = new Offer({
+            items: [wine('a', 30, { type: 'red' }), wine('b', 10, { type: 'red' }), wine('c', 20, { type: 'red' })],
+        }).setSort({ field: 'price', dir: 'asc' });
+
+        expect(offer.toSummary().thumbnails.map((t) => t.title)).toEqual(['Wine b', 'Wine c', 'Wine a']);
+    });
+
+    it('omits empty groups', () => {
+        const summary = new Offer({ items: [wine('a', 10, { type: 'red' })] }).toSummary();
+        expect(summary.groups).toHaveLength(1);
+        expect(summary.groups.every((g) => g.count > 0)).toBe(true);
+    });
+
+    it('returns an empty preview for an empty offer', () => {
+        expect(new Offer().toSummary()).toEqual({
+            thumbnails: [],
+            groups: [],
+            groupingMode: 'type',
+            wineCount: 0,
+            status: 'draft',
+        });
+    });
+
     it('toJSON embeds the summary as a top-level sibling of items', () => {
-        const json = new Offer({
-            items: [new OfferItem({ price: 10, id: 'i1', data: { imgUrl: 'a.png', title: 'Wine A' } })],
-        }).toJSON();
+        const json = new Offer({ items: [wine('a', 10, { type: 'red' })] }).toJSON();
         expect(json.summary).toEqual({
-            thumbnails: [{ imgUrl: 'a.png', title: 'Wine A' }],
+            thumbnails: [{ imgUrl: 'a.png', title: 'Wine a' }],
+            groups: [{ value: 'red', count: 1, thumbnails: [{ imgUrl: 'a.png', title: 'Wine a' }] }],
+            groupingMode: 'type',
             wineCount: 1,
             status: 'draft',
         });
+    });
+});
+
+describe('Sort', () => {
+    const wine = (id: string, price: number) => new OfferItem({ price, id, data: { title: id } });
+
+    it('stores the sort on the data bag and round-trips through toJSON', () => {
+        const offer = new Offer().setSort({ field: 'name', dir: 'desc' });
+        expect(offer.sort).toEqual({ field: 'name', dir: 'desc' });
+
+        const json = offer.toJSON();
+        expect(json.data['sort']).toEqual({ field: 'name', dir: 'desc' });
+        expect(new Offer({ data: json.data }).sort).toEqual({ field: 'name', dir: 'desc' });
+    });
+
+    it('clears the sort when passed null', () => {
+        const offer = new Offer().setSort({ field: 'price', dir: 'asc' }).setSort(null);
+        expect(offer.sort).toBeUndefined();
+        expect('sort' in offer.data).toBe(false);
+    });
+
+    it('sortedItems keeps insertion order when no sort is set', () => {
+        const offer = new Offer({ items: [wine('a', 30), wine('b', 10)] });
+        expect(offer.sortedItems.map((i) => i.id)).toEqual(['a', 'b']);
+    });
+
+    it('sortedItems applies the saved sort', () => {
+        const offer = new Offer({ items: [wine('a', 30), wine('b', 10), wine('c', 20)] })
+            .setSort({ field: 'price', dir: 'desc' });
+        expect(offer.sortedItems.map((i) => i.id)).toEqual(['a', 'c', 'b']);
+    });
+
+    it('setSort returns a new frozen Offer and leaves the original untouched', () => {
+        const original = new Offer();
+        const sorted = original.setSort({ field: 'price', dir: 'asc' });
+        expect(sorted).not.toBe(original);
+        expect(original.sort).toBeUndefined();
+        expect(Object.isFrozen(sorted)).toBe(true);
     });
 });

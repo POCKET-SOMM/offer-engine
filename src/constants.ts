@@ -18,3 +18,8 @@ export const DEFAULT_OFFER_STATUS: OfferStatus = 'draft';
 // How many leading items toSummary() includes as thumbnails — a compact preview
 // for offer-list rows, not the full item set.
 export const SUMMARY_THUMBNAIL_LIMIT = 8;
+
+// Per-group thumbnail cap for toSummary().groups. Kept small so every group is
+// represented in a list row; each group also carries its true `count`, so a
+// consumer can render a "+N" tile beyond these.
+export const SUMMARY_GROUP_THUMBNAIL_LIMIT = 3;

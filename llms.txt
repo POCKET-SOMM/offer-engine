@@ -23,6 +23,17 @@ A collection of `OfferItem`s with aggregated totals.
 - **Updates**: Individual item updates via `updateItem(id, fields|fn)`.
 - **Status**: `offer.status` (getter, defaults to `'draft'`) and `setStatus(status)`. Valid values:
   `OFFER_STATUSES` (`'draft' | 'sent' | 'accepted'`, type `OfferStatus`).
+- **Sort**: `offer.sort` (getter), `setSort({ field, dir } | null)`, and `offer.sortedItems`
+  (items in the saved order — insertion order when no sort is set). Persisted on the `data` bag
+  like grouping, so an offer's ordering survives a round-trip instead of being a per-session
+  consumer preference.
+
+### Sorting (`src/sorting/sortItems.ts`)
+`sortItems(items, { field, dir })` — pure, non-mutating ordering. Fields: `name` (by `data.title`,
+case-insensitive), `price` (net `pricePerBottle`), `quantity`, `vintage` (falls back to `data.year`).
+Direction: `'asc' | 'desc'`. `DEFAULT_SORT` is `{ field: 'price', dir: 'asc' }`. An unknown field is a
+deliberate no-op (returns the items in their existing order) so a stale persisted sort can never
+throw or drop items.
 
 ### Convention: the `data` bag (`offer.data` / `item.data`)
 Both `Offer` and `OfferItem` carry a free-form `data: Record<string, any>` that the constructor
@@ -34,12 +45,29 @@ fields the engine doesn't model — so a feature can be added **without** wideni
 - `OfferItem.data` holds the original wine object (`imgUrl`, `title`, region, etc.).
 
 ### Convention: `toSummary()` and `toJSON().summary`
-`toSummary()` returns a compact `OfferSummary` — `{ thumbnails: {imgUrl,title}[] (first 8 items),
-wineCount, status }` — for list/index views that shouldn't load every item. `toJSON()` embeds it as
-`summary`, a **top-level sibling of `items`/`totals`** (not nested under `data`). Because it's part of
-`toJSON()`, it's recomputed on every serialization and can't drift. The save envelope is
-`{ data: offer.toJSON() }`, so a list endpoint surfaces the brief payload by reading
-`record.data.summary`; the status lives one level deeper at `record.data.data.status`.
+`toSummary()` returns a compact `OfferSummary` for list/index views that shouldn't load every item:
+- `thumbnails` — flat `{imgUrl,title}[]`, first 8 items (`SUMMARY_THUMBNAIL_LIMIT`).
+- `groups` — the same wines grouped **the way the offer itself is grouped**:
+  `{ value, label?, count, thumbnails }[]`. Each group is capped at 3 thumbnails
+  (`SUMMARY_GROUP_THUMBNAIL_LIMIT`) while `count` reports the group's **true** size, so a list row can
+  render a "+N" tile. `label` is set only for custom categories; built-in `type`/`country` groups
+  expose a `value` key the consumer localizes itself. Empty groups are omitted.
+- `groupingMode` — the mode `groups` was built with.
+- `wineCount`, `status`.
+
+Item order (flat and within groups) follows the offer's saved `sort`, or insertion order when unset.
+
+**Strategy grouping is previewed as `type`.** A saved strategy's definition (categories + filter
+rules) lives in the *consumer app*, not on the offer — `groupItems` needs it passed in via
+`options.savedStrategies`, which `toSummary()` has no access to. Manual (`custom`) grouping is fully
+self-contained on `offer.data.grouping` and IS honoured, as are `type`/`country`.
+
+`toJSON()` embeds the summary as `summary`, a **top-level sibling of `items`/`totals`** (not nested
+under `data`). Because it's part of `toJSON()`, it's recomputed on every serialization and can't
+drift. The save envelope is `{ data: offer.toJSON() }`, so a list endpoint surfaces the brief payload
+by reading `record.data.summary`; the status lives one level deeper at `record.data.data.status`.
+NOTE: the summary is written at save time — offers stored before a summary-shape change keep the old
+shape until they're next saved.
 
 ## Usage for Agents
 - Always use the `update` methods rather than creating new objects from scratch if you want to preserve the "lock" on explicit targets.
