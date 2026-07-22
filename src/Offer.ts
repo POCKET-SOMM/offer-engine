@@ -18,7 +18,12 @@ export interface OfferConfig {
     id?: string;
     title?: string;
     items?: readonly OfferItem[];
-    menu?: any; // Generic as it's outside the math engine scope
+    /** Canonical multi-menu store. Each entry is an opaque menu object (the math
+     *  engine never inspects it — pairing lives in the consumer app). */
+    menus?: readonly any[];
+    /** @deprecated Legacy single menu. Wrapped into `menus` on construction so
+     *  older stored blobs and callers keep working. Prefer `menus`. */
+    menu?: any;
     data?: Record<string, any>;
 }
 
@@ -26,7 +31,7 @@ export class Offer {
     public readonly id: string;
     public readonly title: string;
     public readonly items: readonly OfferItem[];
-    public readonly menu: any | null;
+    public readonly menus: readonly any[];
     public readonly data: Record<string, any>;
 
     // Computed Grand Totals
@@ -36,13 +41,23 @@ export class Offer {
         this.id = config.id || crypto.randomUUID();
         this.title = config.title || '';
         this.items = Object.freeze(config.items || []);
-        this.menu = config.menu || null;
+        // `menus` is canonical; a legacy single `menu` is wrapped so old blobs
+        // (and callers still passing `menu`) load transparently. `menus` wins if
+        // both are present — that's the post-migration shape.
+        this.menus = Object.freeze(config.menus ?? (config.menu ? [config.menu] : []));
         this.data = config.data || {};
 
         // Calculate aggregate totals whenever an Offer is created
         this.totals = Object.freeze(this._calculateGrandTotals());
 
         Object.freeze(this);
+    }
+
+    /** Back-compat accessor: the first attached menu, or null. A prototype
+     *  getter (not an own field), so `{ ...this }` spreads `menus` rather than a
+     *  stale `menu` — keeps single-menu consumers working through the migration. */
+    get menu(): any | null {
+        return this.menus[0] ?? null;
     }
 
     private _calculateGrandTotals(): OfferTotals {
@@ -72,8 +87,25 @@ export class Offer {
         return new Offer({ ...this, title });
     }
 
+    /** Replace the full set of attached menus. */
+    setMenus(menus: any[]): Offer {
+        return new Offer({ ...this, menus });
+    }
+
+    /** Append one menu. */
+    addMenu(menu: any): Offer {
+        return this.setMenus([...this.menus, menu]);
+    }
+
+    /** Remove a menu by id. No-op if the id isn't attached. */
+    removeMenu(menuId: string): Offer {
+        return this.setMenus(this.menus.filter((m) => m?.id !== menuId));
+    }
+
+    /** @deprecated Single-menu shim — replaces all menus with `[menu]` (or clears
+     *  them when null). Prefer setMenus / addMenu / removeMenu. */
     setMenu(menu: any): Offer {
-        return new Offer({ ...this, menu });
+        return this.setMenus(menu ? [menu] : []);
     }
 
     // --- Status ---
@@ -412,12 +444,18 @@ export class Offer {
                 };
             });
 
+        const menuTitles = this.menus
+            .map((menu) => menu?.title)
+            .filter((title): title is string => typeof title === 'string' && title.length > 0);
+
         return {
             thumbnails: ordered.slice(0, SUMMARY_THUMBNAIL_LIMIT).map(toThumb),
             groups,
             groupingMode: mode,
             wineCount: this.items.length,
             status: this.status,
+            // Titles of all attached menus, in order.
+            menuTitles,
         };
     }
 
@@ -430,6 +468,9 @@ export class Offer {
         return {
             id: this.id,
             title: this.title,
+            menus: this.menus,
+            // Mirror the first menu under the legacy key so blob readers still on
+            // the single-menu shape keep working. Remove once all are migrated.
             menu: this.menu,
             items: this.items.map(item => item.toJSON()),
             totals: this.totals,

@@ -456,6 +456,7 @@ describe('Summary', () => {
             groupingMode: 'type',
             wineCount: 2,
             status: 'sent',
+            menuTitles: [],
         });
     });
 
@@ -540,6 +541,7 @@ describe('Summary', () => {
             groupingMode: 'type',
             wineCount: 0,
             status: 'draft',
+            menuTitles: [],
         });
     });
 
@@ -551,7 +553,76 @@ describe('Summary', () => {
             groupingMode: 'type',
             wineCount: 1,
             status: 'draft',
+            menuTitles: [],
         });
+    });
+});
+
+describe('Menus', () => {
+    it('defaults to an empty menus array', () => {
+        expect(new Offer().menus).toEqual([]);
+        expect(new Offer().menu).toBeNull();
+    });
+
+    it('wraps a legacy single `menu` config into `menus`', () => {
+        const offer = new Offer({ menu: { id: 'm1', title: 'Dinner' } });
+        expect(offer.menus).toEqual([{ id: 'm1', title: 'Dinner' }]);
+        // Back-compat accessor still resolves the first menu.
+        expect(offer.menu).toEqual({ id: 'm1', title: 'Dinner' });
+    });
+
+    it('prefers `menus` over a legacy `menu` when both are present', () => {
+        const offer = new Offer({
+            menus: [{ id: 'a', title: 'A' }],
+            menu: { id: 'b', title: 'B' },
+        });
+        expect(offer.menus.map((m) => m.id)).toEqual(['a']);
+    });
+
+    it('add / remove / setMenus are immutable and preserve order', () => {
+        const base = new Offer()
+            .addMenu({ id: 'm1', title: 'One' })
+            .addMenu({ id: 'm2', title: 'Two' });
+        expect(base.menus.map((m) => m.id)).toEqual(['m1', 'm2']);
+
+        const dropped = base.removeMenu('m1');
+        expect(dropped.menus.map((m) => m.id)).toEqual(['m2']);
+        // Original is untouched.
+        expect(base.menus.map((m) => m.id)).toEqual(['m1', 'm2']);
+
+        expect(base.setMenus([]).menus).toEqual([]);
+    });
+
+    it('setMenu shim replaces all menus (and clears on null)', () => {
+        const offer = new Offer().addMenu({ id: 'a' }).addMenu({ id: 'b' });
+        expect(offer.setMenu({ id: 'c' }).menus.map((m) => m.id)).toEqual(['c']);
+        expect(offer.setMenu(null).menus).toEqual([]);
+    });
+
+    it('round-trips menus through toJSON / new Offer and mirrors legacy `menu`', () => {
+        const json = new Offer()
+            .addMenu({ id: 'm1', title: 'One' })
+            .addMenu({ id: 'm2', title: 'Two' })
+            .toJSON();
+        expect(json.menus.map((m: any) => m.id)).toEqual(['m1', 'm2']);
+        expect(json.menu).toEqual({ id: 'm1', title: 'One' });
+        expect(new Offer(json).menus.map((m) => m.id)).toEqual(['m1', 'm2']);
+    });
+
+    it('summary lists every attached menu title in order', () => {
+        const offer = new Offer()
+            .addMenu({ id: 'm1', title: 'Dinner' })
+            .addMenu({ id: 'm2', title: 'Wine Card' })
+            .addMenu({ id: 'm3' }); // untitled → skipped
+        expect(offer.toSummary().menuTitles).toEqual(['Dinner', 'Wine Card']);
+    });
+
+    it('menus survive unrelated mutations (title, status, grouping)', () => {
+        const offer = new Offer({ menus: [{ id: 'm1', title: 'One' }] })
+            .updateTitle('Renamed')
+            .setStatus('sent')
+            .setGrouping({ mode: 'country' });
+        expect(offer.menus.map((m) => m.id)).toEqual(['m1']);
     });
 });
 

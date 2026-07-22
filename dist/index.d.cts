@@ -72,6 +72,8 @@ interface OfferSummary {
     groupingMode: GroupingMode;
     wineCount: number;
     status: OfferStatus;
+    /** Titles of all attached menus, in order. Empty when no menu is attached. */
+    menuTitles: string[];
 }
 interface ItemConfig {
     price: number;
@@ -173,6 +175,11 @@ interface OfferConfig {
     id?: string;
     title?: string;
     items?: readonly OfferItem[];
+    /** Canonical multi-menu store. Each entry is an opaque menu object (the math
+     *  engine never inspects it — pairing lives in the consumer app). */
+    menus?: readonly any[];
+    /** @deprecated Legacy single menu. Wrapped into `menus` on construction so
+     *  older stored blobs and callers keep working. Prefer `menus`. */
     menu?: any;
     data?: Record<string, any>;
 }
@@ -180,13 +187,25 @@ declare class Offer {
     readonly id: string;
     readonly title: string;
     readonly items: readonly OfferItem[];
-    readonly menu: any | null;
+    readonly menus: readonly any[];
     readonly data: Record<string, any>;
     readonly totals: OfferTotals;
     constructor(config?: OfferConfig);
+    /** Back-compat accessor: the first attached menu, or null. A prototype
+     *  getter (not an own field), so `{ ...this }` spreads `menus` rather than a
+     *  stale `menu` — keeps single-menu consumers working through the migration. */
+    get menu(): any | null;
     private _calculateGrandTotals;
     private _getMultiplier;
     updateTitle(title: string): Offer;
+    /** Replace the full set of attached menus. */
+    setMenus(menus: any[]): Offer;
+    /** Append one menu. */
+    addMenu(menu: any): Offer;
+    /** Remove a menu by id. No-op if the id isn't attached. */
+    removeMenu(menuId: string): Offer;
+    /** @deprecated Single-menu shim — replaces all menus with `[menu]` (or clears
+     *  them when null). Prefer setMenus / addMenu / removeMenu. */
     setMenu(menu: any): Offer;
     /** Manual lifecycle status. Defaults to 'draft' when unset. */
     get status(): OfferStatus;
@@ -282,6 +301,7 @@ declare class Offer {
     toJSON(): {
         id: string;
         title: string;
+        menus: readonly any[];
         menu: any;
         items: {
             pricePerUnit: number;

@@ -36,6 +36,8 @@ export interface OfferSummary {
     groupingMode: GroupingMode;
     wineCount: number;
     status: OfferStatus;
+    /** Titles of all attached menus, in order. Empty when no menu is attached. */
+    menuTitles: string[];
 }
 
 export interface ItemConfig {

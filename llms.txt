@@ -35,6 +35,16 @@ Direction: `'asc' | 'desc'`. `DEFAULT_SORT` is `{ field: 'price', dir: 'asc' }`.
 deliberate no-op (returns the items in their existing order) so a stale persisted sort can never
 throw or drop items.
 
+### Menus (`offer.menus`)
+An offer holds **`menus: readonly any[]`** — opaque menu objects the engine never inspects (pairing
+logic lives in the consumer app). Mutate immutably with `setMenus(menus)`, `addMenu(menu)`,
+`removeMenu(menuId)` (matches on `menu.id`). Back-compat during the single→multi migration:
+- `offer.menu` is a **getter** returning `menus[0] ?? null` (prototype getter, so `{ ...offer }` spreads
+  `menus`, never a stale `menu`).
+- `setMenu(menu)` is a shim → `setMenus(menu ? [menu] : [])`.
+- The constructor accepts a legacy single `menu` and wraps it into `menus`; `menus` wins if both given.
+- `toJSON()` writes `menus` **and** mirrors the first under `menu` for readers still on the old shape.
+
 ### Convention: the `data` bag (`offer.data` / `item.data`)
 Both `Offer` and `OfferItem` carry a free-form `data: Record<string, any>` that the constructor
 preserves verbatim across every immutable operation. It's the home for consumer-owned, non-financial
@@ -54,6 +64,7 @@ fields the engine doesn't model — so a feature can be added **without** wideni
   expose a `value` key the consumer localizes itself. Empty groups are omitted.
 - `groupingMode` — the mode `groups` was built with.
 - `wineCount`, `status`.
+- `menuTitles` — titles of all attached menus in order (untitled menus omitted); `[]` when none.
 
 Item order (flat and within groups) follows the offer's saved `sort`, or insertion order when unset.
 
