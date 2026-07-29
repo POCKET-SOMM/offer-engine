@@ -13,6 +13,13 @@ import { normalizeCustomGrouping, validateCategoryName } from './grouping/normal
 import { groupItems } from './grouping/groupItems.js';
 import type { CustomCategory, GroupingConfig, GroupingMode } from './grouping/types.js';
 import { sortItems, type SortConfig } from './sorting/sortItems.js';
+import { buildBaseline, countOpenRequests, itemByLineId } from './negotiation/derive.js';
+import type {
+    ChangeRequest,
+    ChangeRequestInput,
+    NegotiationLogLine,
+    NegotiationState,
+} from './negotiation/types.js';
 
 export interface OfferConfig {
     id?: string;
@@ -165,11 +172,15 @@ export class Offer {
     }
 
     /**
-     * Replaces an old item with a new one (Swap)
+     * Replaces an old item with a new one (Swap).
+     * The outgoing item's lineId is carried onto the replacement so references
+     * that point at the line (negotiation requests) survive the swap. An
+     * explicit lineId in the config wins — that's how swap-undo restores the
+     * original line identity.
      */
     swapItem(oldId: string, newConfig: ItemConfig): Offer {
         const newItems = this.items.map(item =>
-            item.id === oldId ? new OfferItem(newConfig) : item
+            item.id === oldId ? new OfferItem({ lineId: item.lineId, ...newConfig }) : item
         );
         return new Offer({ ...this, items: newItems });
     }
@@ -253,6 +264,147 @@ export class Offer {
         });
 
         return new Offer({ ...this, items: newItems });
+    }
+
+    // --- Negotiation ---
+    // Two-way change negotiation on a live offer. The whole structure lives on
+    // the data bag (like grouping/sort/status) so it round-trips through
+    // toJSON()/new Offer() untouched. Request outcomes are DERIVED from the
+    // items (negotiation/derive.ts), never stored — see negotiation/types.ts.
+
+    /** The negotiation conversation, or undefined for a never-shared draft. */
+    get negotiation(): NegotiationState | undefined {
+        return this.data?.['negotiation'] as NegotiationState | undefined;
+    }
+
+    private _negotiationOrFresh(): NegotiationState {
+        return this.negotiation ?? {
+            state: 'open',
+            turn: 'buyer',
+            versions: [],
+            requests: [],
+            unpromptedNotes: {},
+        };
+    }
+
+    private _withNegotiation(negotiation: NegotiationState, extraData: Record<string, any> = {}): Offer {
+        return new Offer({ ...this, data: { ...this.data, ...extraData, negotiation } });
+    }
+
+    private _updateRequest(id: string, patch: Partial<ChangeRequest>): Offer {
+        const neg = this.negotiation;
+        if (!neg) return this;
+        return this._withNegotiation({
+            ...neg,
+            requests: neg.requests.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+        });
+    }
+
+    /**
+     * Seller transmission: record a version of the offer as it stands (initial
+     * share and every answer round). Freezes the caller-composed log, snapshots
+     * the baseline, clears the answered round, and passes the turn.
+     * `sentAt` is caller-supplied so the engine stays deterministic.
+     */
+    sendVersion({ senderName, sentAt, log = [] }: {
+        senderName?: string;
+        sentAt: string;
+        log?: NegotiationLogLine[];
+    }): Offer {
+        const neg = this._negotiationOrFresh();
+        const version = {
+            id: crypto.randomUUID(),
+            number: neg.versions.length + 1,
+            sender: 'seller' as const,
+            senderName,
+            sentAt,
+            log,
+            baseline: buildBaseline(this, this.totals.totalPrice),
+        };
+        return this._withNegotiation(
+            { ...neg, versions: [...neg.versions, version], requests: [], unpromptedNotes: {}, turn: 'buyer' },
+            { status: 'sent' },
+        );
+    }
+
+    /**
+     * Buyer transmission: a round of change requests. Stamps each request's
+     * identity and its `from` quantity off the current line, snapshots the
+     * baseline, and passes the turn to the seller.
+     */
+    submitRequests({ requests, senderName, sentAt, log = [] }: {
+        requests: ChangeRequestInput[];
+        senderName?: string;
+        sentAt: string;
+        log?: NegotiationLogLine[];
+    }): Offer {
+        const neg = this._negotiationOrFresh();
+        const versionId = crypto.randomUUID();
+        const version = {
+            id: versionId,
+            number: neg.versions.length + 1,
+            sender: 'buyer' as const,
+            senderName,
+            sentAt,
+            log,
+            baseline: buildBaseline(this, this.totals.totalPrice),
+        };
+        const stamped: ChangeRequest[] = requests.map((input) => ({
+            id: crypto.randomUUID(),
+            versionId,
+            kind: input.kind,
+            lineId: input.lineId ?? null,
+            from: input.lineId != null ? (itemByLineId(this, input.lineId)?.quantity ?? null) : null,
+            to: input.to ?? null,
+            wine: input.wine ?? null,
+            note: input.note ?? null,
+            declined: false,
+            answerNote: null,
+            answeredFreeText: false,
+        }));
+        return this._withNegotiation({
+            ...neg,
+            versions: [...neg.versions, version],
+            requests: stamped,
+            unpromptedNotes: {},
+            turn: 'seller',
+        });
+    }
+
+    /** Explicitly decline a request — the one outcome the items can't express. */
+    declineRequest(id: string): Offer {
+        return this._updateRequest(id, { declined: true });
+    }
+
+    undeclineRequest(id: string): Offer {
+        return this._updateRequest(id, { declined: false });
+    }
+
+    /** The answerer's note, captured at the moment of the decision. */
+    setRequestAnswer(id: string, note: string | null): Offer {
+        return this._updateRequest(id, { answerNote: note });
+    }
+
+    /** Settle a free-text ask ('note', or 'add' nothing was added for). */
+    markFreeTextAnswered(id: string, answered: boolean = true): Offer {
+        return this._updateRequest(id, { answeredFreeText: answered });
+    }
+
+    /** Seller note on an unprompted change, keyed by the line it touches. The
+     *  change itself is derived; only the note needs storage. */
+    setUnpromptedNote(lineId: string, note: string): Offer {
+        const neg = this.negotiation;
+        if (!neg) return this;
+        const unpromptedNotes = { ...neg.unpromptedNotes };
+        if (note) unpromptedNotes[lineId] = note;
+        else delete unpromptedNotes[lineId];
+        return this._withNegotiation({ ...neg, unpromptedNotes });
+    }
+
+    /** Buyer accepts the offer as it stands. Ends the conversation. */
+    acceptNegotiation(): Offer {
+        const neg = this._negotiationOrFresh();
+        return this._withNegotiation({ ...neg, state: 'accepted' }, { status: 'accepted' });
     }
 
     // --- Grouping ---
@@ -448,6 +600,8 @@ export class Offer {
             .map((menu) => menu?.title)
             .filter((title): title is string => typeof title === 'string' && title.length > 0);
 
+        const negotiation = this.negotiation;
+
         return {
             thumbnails: ordered.slice(0, SUMMARY_THUMBNAIL_LIMIT).map(toThumb),
             groups,
@@ -456,6 +610,16 @@ export class Offer {
             status: this.status,
             // Titles of all attached menus, in order.
             menuTitles,
+            // Negotiation badge data for list rows ("Your move" / "Their move" /
+            // "Approved") — only present once an offer has been shared.
+            ...(negotiation ? {
+                negotiation: {
+                    state: negotiation.state,
+                    turn: negotiation.turn,
+                    openCount: countOpenRequests(this),
+                    versionCount: negotiation.versions.length,
+                },
+            } : {}),
         };
     }
 

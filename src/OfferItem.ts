@@ -4,6 +4,12 @@ import type { ItemConfig, PourVolume } from './types.js';
 
 export class OfferItem {
     public readonly id: string;
+    /** Durable line identity. Unlike `id` (which is replaced by swapItem and
+     *  dropped with removeItems), `lineId` survives a swap — negotiation
+     *  requests reference lines through it so the conversation can keep
+     *  pointing at "this slot in the offer" across rounds. Defaults to `id`,
+     *  so offers stored before this field existed load with lineId === id. */
+    public readonly lineId: string;
     public readonly price: number;
     public readonly discount: number;
     public readonly margin: number;
@@ -26,6 +32,7 @@ export class OfferItem {
 
     constructor(config: ItemConfig) {
         this.id = config.id || crypto.randomUUID();
+        this.lineId = config.lineId || this.id;
         this.price = config.price;
         this.unit = config.unit || 'bottle';
         this.quantity = config.quantity ?? 1;
@@ -180,6 +187,7 @@ export class OfferItem {
     toConfig(): ItemConfig {
         return {
             id: this.id,
+            lineId: this.lineId,
             price: this.price,
             discount: this.discount,
             margin: this.margin,

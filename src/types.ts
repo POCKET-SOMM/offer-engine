@@ -1,5 +1,6 @@
 import type { OfferStatus } from './constants.js';
 import type { GroupingMode } from './grouping/types.js';
+import type { NegotiationSummary } from './negotiation/types.js';
 
 export interface PourVolume {
     volume: number;      // ml, primary key (unique per item)
@@ -38,6 +39,8 @@ export interface OfferSummary {
     status: OfferStatus;
     /** Titles of all attached menus, in order. Empty when no menu is attached. */
     menuTitles: string[];
+    /** Negotiation badge data — present once the offer has been shared. */
+    negotiation?: NegotiationSummary;
 }
 
 export interface ItemConfig {
@@ -49,6 +52,8 @@ export interface ItemConfig {
     vatRate?: number | undefined;
     tags?: string[] | undefined;
     id?: string | undefined;
+    /** Durable line identity — see OfferItem.lineId. Defaults to `id`. */
+    lineId?: string | undefined;
     gross?: number | undefined;
     customerPrice?: number | undefined;
     pricePerBottle?: number | undefined;

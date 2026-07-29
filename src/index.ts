@@ -34,3 +34,34 @@ export type {
     WineTypeKey,
 } from './grouping/types.js';
 export type { CategoryNameValidation } from './grouping/normalize.js';
+
+// Negotiation
+export {
+    resolveRequest,
+    resolveRequests,
+    countOpenRequests,
+    deriveUnpromptedChanges,
+    itemByLineId,
+    latestBaseline,
+    buildBaseline,
+} from './negotiation/derive.js';
+export { NEGOTIATION_PARTIES, REQUEST_KINDS, REQUEST_OUTCOMES } from './negotiation/types.js';
+export type {
+    NegotiationParty,
+    RequestKind,
+    RequestOutcome,
+    NegotiationLogLine,
+    BaselineLine,
+    NegotiationBaseline,
+    NegotiationVersion,
+    ChangeRequest,
+    ChangeRequestInput,
+    NegotiationState,
+    NegotiationSummary,
+} from './negotiation/types.js';
+export type {
+    ResolvedRequest,
+    UnpromptedChange,
+    UnpromptedChangeType,
+    NegotiationOfferView,
+} from './negotiation/derive.js';

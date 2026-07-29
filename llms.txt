@@ -80,6 +80,37 @@ by reading `record.data.summary`; the status lives one level deeper at `record.d
 NOTE: the summary is written at save time — offers stored before a summary-shape change keep the old
 shape until they're next saved.
 
+### Line identity: `item.lineId`
+Every `OfferItem` carries a durable `lineId` (defaults to `id`; stored blobs without it load as
+`lineId === id`). Unlike `id` — which `swapItem()` replaces and `removeItems()` drops — `lineId` is
+carried onto a swap's replacement item, so a reference to "this slot in the offer" survives rounds
+of negotiation. An explicit `lineId` in a swap config wins (that's how swap-undo restores identity).
+
+### Negotiation (`src/negotiation/`, stored at `offer.data.negotiation`)
+Two-way change negotiation on a live offer. `NegotiationState`: `state` (`'open'|'accepted'`),
+`turn` (`'seller'|'buyer'`), append-only `versions` (one per transmission: sender, sentAt, frozen
+display `log`, and a compact `baseline` of the lines as transmitted), the live round's `requests`,
+and `unpromptedNotes` (seller notes keyed by lineId).
+- **Outcomes are derived, never stored.** `resolveRequest(request, offer)` returns
+  `{ outcome: 'open'|'done'|'changed'|'declined', label, params }` — label is an i18n token
+  (`doneAsAsked`, `setToInstead`, `cutToInstead`, `swappedFor`, `droppedNoReplacement`,
+  `removedInstead`, `removed`, `added`, `answered`, `declined`). Editing the wine list by hand
+  settles a request identically to any sidebar shortcut. The only stored resolution state:
+  `declined`, `answerNote`, `answeredFreeText` (for free-text asks with nothing to derive from).
+- **Unprompted changes are derived too**: `deriveUnpromptedChanges(offer)` diffs current items vs
+  the latest version's baseline (quantity/price/swap/add/remove), excluding edits a live request
+  explains. Reverting the edit removes the entry.
+- **Flow methods on `Offer`** (immutable, timestamps caller-supplied — the engine never reads the
+  clock): `sendVersion({ senderName, sentAt, log })` (seller; also sets status `'sent'`),
+  `submitRequests({ requests, senderName, sentAt })` (buyer; stamps `from` off current lines),
+  `declineRequest/undeclineRequest(id)`, `setRequestAnswer(id, note)`,
+  `markFreeTextAnswered(id)`, `setUnpromptedNote(lineId, note)`, `acceptNegotiation()`.
+- Helpers: `resolveRequests`, `countOpenRequests`, `itemByLineId`, `latestBaseline`.
+- `toSummary()` embeds `negotiation: { state, turn, openCount, versionCount }` once shared — list
+  rows badge "Your move" / "Their move" / "Approved" without loading items.
+- Versions are **a record, not a snapshot**: baselines exist only to derive deltas/unprompted
+  changes for the following round; there is no restore and no historical rendering.
+
 ## Usage for Agents
 - Always use the `update` methods rather than creating new objects from scratch if you want to preserve the "lock" on explicit targets.
 - The `dist/` directory is built using `tsup`. Run `npm run build` after changes.

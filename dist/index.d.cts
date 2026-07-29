@@ -46,6 +46,112 @@ declare const STRATEGY_MISSING_VALUE = "__strategy_missing__";
 declare const WINE_TYPE_KEYS: readonly ["sparkling", "white", "rose", "red", "fortified", "dessert"];
 type WineTypeKey = typeof WINE_TYPE_KEYS[number];
 
+declare const NEGOTIATION_PARTIES: readonly ["seller", "buyer"];
+type NegotiationParty = (typeof NEGOTIATION_PARTIES)[number];
+declare const REQUEST_KINDS: readonly ["quantity", "remove", "replace", "add", "note"];
+type RequestKind = (typeof REQUEST_KINDS)[number];
+declare const REQUEST_OUTCOMES: readonly ["open", "done", "changed", "declined"];
+type RequestOutcome = (typeof REQUEST_OUTCOMES)[number];
+/** A frozen, display-ready record line for a sent version. Composed by the
+ *  consumer (i18n lives there) and stored verbatim — numbers it contains are
+ *  captured at send time so they can never drift. */
+interface NegotiationLogLine {
+    text: string;
+    note?: string | undefined;
+    who?: string | undefined;
+}
+/** One line of the offer as it stood at a transmission. */
+interface BaselineLine {
+    lineId: string;
+    /** The wine's catalogue id (item.data.id), used to detect swaps. */
+    wineId: string | null;
+    title: string;
+    quantity: number;
+    unit: string;
+    pricePerUnit: number;
+    totalPrice: number;
+}
+/** Compact snapshot of the offer as transmitted. NOT a restore point and never
+ *  rendered as a historical offer — it exists solely to derive `from → to`
+ *  deltas and unprompted changes in the round that follows, and to freeze
+ *  totals into log lines at send time. */
+interface NegotiationBaseline {
+    totals: {
+        totalPrice: number;
+    };
+    lines: BaselineLine[];
+}
+/** One transmission by one party. Immutable once pushed. */
+interface NegotiationVersion {
+    id: string;
+    /** 1-based, in send order. */
+    number: number;
+    sender: NegotiationParty;
+    /** Display attribution captured at send ("Marco Bianchi · Bottega Nord"). */
+    senderName?: string | undefined;
+    /** ISO timestamp, supplied by the caller (the engine never reads the clock). */
+    sentAt: string;
+    log: NegotiationLogLine[];
+    baseline: NegotiationBaseline;
+}
+/** A buyer ask from the live round. `from`/`declined`/`answerNote`/
+ *  `answeredFreeText` are the only stored resolution state — everything else
+ *  about "is this handled?" is derived (derive.ts). */
+interface ChangeRequest {
+    id: string;
+    /** The buyer transmission that carried it. */
+    versionId: string;
+    kind: RequestKind;
+    /** Target line. Null for free-text asks ('add' with no wine, 'note'). */
+    lineId: string | null;
+    /** Quantity as it stood when the round arrived — the "10" in "10 → 20". */
+    from: number | null;
+    /** Requested quantity ('quantity' kind only). */
+    to: number | null;
+    /** Requested wine for 'replace'/'add', in the consumer's wine shape. */
+    wine: Record<string, any> | null;
+    /** The requester's note. */
+    note: string | null;
+    /** Explicitly declined by the answerer — the one non-derivable outcome. */
+    declined: boolean;
+    /** The answerer's note, captured at the moment of the decision. */
+    answerNote: string | null;
+    /** 'note'-kind asks have nothing in the wine list to derive from; this is
+     *  their explicit "I've answered this" bit. */
+    answeredFreeText: boolean;
+}
+/** Consumer-facing input for submitting a round of requests — the engine
+ *  stamps id, versionId, `from`, and the resolution fields itself. */
+interface ChangeRequestInput {
+    kind: RequestKind;
+    lineId?: string | null | undefined;
+    to?: number | null | undefined;
+    wine?: Record<string, any> | null | undefined;
+    note?: string | null | undefined;
+}
+interface NegotiationState {
+    state: 'open' | 'accepted';
+    /** Whose move it is. Flips on every transmission. */
+    turn: NegotiationParty;
+    /** Append-only, oldest first. */
+    versions: NegotiationVersion[];
+    /** The live round's requests only. Frozen into the answering version's log
+     *  at send and cleared. */
+    requests: ChangeRequest[];
+    /** Seller notes on unprompted changes, keyed by lineId. The changes
+     *  themselves are derived (diff vs the latest baseline) — only the note
+     *  needs storage. Cleared at send after being frozen into the log. */
+    unpromptedNotes: Record<string, string>;
+}
+/** Projection embedded in toSummary() so list rows can badge "Your move" /
+ *  "Their move" / "Approved" without loading items. */
+interface NegotiationSummary {
+    state: NegotiationState['state'];
+    turn: NegotiationParty;
+    openCount: number;
+    versionCount: number;
+}
+
 interface PourVolume {
     volume: number;
     price: number;
@@ -74,6 +180,8 @@ interface OfferSummary {
     status: OfferStatus;
     /** Titles of all attached menus, in order. Empty when no menu is attached. */
     menuTitles: string[];
+    /** Negotiation badge data — present once the offer has been shared. */
+    negotiation?: NegotiationSummary;
 }
 interface ItemConfig {
     price: number;
@@ -84,6 +192,8 @@ interface ItemConfig {
     vatRate?: number | undefined;
     tags?: string[] | undefined;
     id?: string | undefined;
+    /** Durable line identity — see OfferItem.lineId. Defaults to `id`. */
+    lineId?: string | undefined;
     gross?: number | undefined;
     customerPrice?: number | undefined;
     pricePerBottle?: number | undefined;
@@ -99,6 +209,12 @@ interface OfferTotals {
 
 declare class OfferItem {
     readonly id: string;
+    /** Durable line identity. Unlike `id` (which is replaced by swapItem and
+     *  dropped with removeItems), `lineId` survives a swap — negotiation
+     *  requests reference lines through it so the conversation can keep
+     *  pointing at "this slot in the offer" across rounds. Defaults to `id`,
+     *  so offers stored before this field existed load with lineId === id. */
+    readonly lineId: string;
     readonly price: number;
     readonly discount: number;
     readonly margin: number;
@@ -140,6 +256,7 @@ declare class OfferItem {
         vatRate?: number | undefined;
         tags?: string[] | undefined;
         id?: string | undefined;
+        lineId?: string | undefined;
         gross?: number | undefined;
         customerPrice?: number | undefined;
         pricePerBottle?: number | undefined;
@@ -226,7 +343,11 @@ declare class Offer {
      */
     updateItem(itemId: string, changes: Partial<ItemConfig> | ((item: OfferItem) => OfferItem)): Offer;
     /**
-     * Replaces an old item with a new one (Swap)
+     * Replaces an old item with a new one (Swap).
+     * The outgoing item's lineId is carried onto the replacement so references
+     * that point at the line (negotiation requests) survive the swap. An
+     * explicit lineId in the config wins — that's how swap-undo restores the
+     * original line identity.
      */
     swapItem(oldId: string, newConfig: ItemConfig): Offer;
     /**
@@ -244,6 +365,45 @@ declare class Offer {
     roundGlassPrices(step?: number, ids?: string[]): Offer;
     roundPourVolumePrices(step?: number, ids?: string[]): Offer;
     setUnit(unit: string, ids?: string[]): Offer;
+    /** The negotiation conversation, or undefined for a never-shared draft. */
+    get negotiation(): NegotiationState | undefined;
+    private _negotiationOrFresh;
+    private _withNegotiation;
+    private _updateRequest;
+    /**
+     * Seller transmission: record a version of the offer as it stands (initial
+     * share and every answer round). Freezes the caller-composed log, snapshots
+     * the baseline, clears the answered round, and passes the turn.
+     * `sentAt` is caller-supplied so the engine stays deterministic.
+     */
+    sendVersion({ senderName, sentAt, log }: {
+        senderName?: string;
+        sentAt: string;
+        log?: NegotiationLogLine[];
+    }): Offer;
+    /**
+     * Buyer transmission: a round of change requests. Stamps each request's
+     * identity and its `from` quantity off the current line, snapshots the
+     * baseline, and passes the turn to the seller.
+     */
+    submitRequests({ requests, senderName, sentAt, log }: {
+        requests: ChangeRequestInput[];
+        senderName?: string;
+        sentAt: string;
+        log?: NegotiationLogLine[];
+    }): Offer;
+    /** Explicitly decline a request — the one outcome the items can't express. */
+    declineRequest(id: string): Offer;
+    undeclineRequest(id: string): Offer;
+    /** The answerer's note, captured at the moment of the decision. */
+    setRequestAnswer(id: string, note: string | null): Offer;
+    /** Settle a free-text ask ('note', or 'add' nothing was added for). */
+    markFreeTextAnswered(id: string, answered?: boolean): Offer;
+    /** Seller note on an unprompted change, keyed by the line it touches. The
+     *  change itself is derived; only the note needs storage. */
+    setUnpromptedNote(lineId: string, note: string): Offer;
+    /** Buyer accepts the offer as it stands. Ends the conversation. */
+    acceptNegotiation(): Offer;
     private _withGrouping;
     private _grouping;
     private _customCategories;
@@ -315,6 +475,7 @@ declare class Offer {
             vatRate?: number | undefined;
             tags?: string[] | undefined;
             id?: string | undefined;
+            lineId?: string | undefined;
             gross?: number | undefined;
             customerPrice?: number | undefined;
             pricePerBottle?: number | undefined;
@@ -378,4 +539,53 @@ type CategoryNameValidation = {
  */
 declare function validateCategoryName(name: string, existing: readonly string[], reserved: readonly string[]): CategoryNameValidation;
 
-export { type CategoryNameValidation, type CustomCategory, DEFAULT_OFFER_STATUS, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, type PourVolume, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, WINE_TYPE_KEYS, type WineTypeKey, detectWineType, groupItems, matchesRules, normalizeCustomGrouping, sortItems, validateCategoryName };
+/** Structural view of an Offer — keeps this module free of a value-import
+ *  cycle with Offer.ts (which imports these functions for toSummary). */
+interface NegotiationOfferView {
+    items: readonly OfferItem[];
+    negotiation?: NegotiationState | undefined;
+}
+interface ResolvedRequest {
+    request: ChangeRequest;
+    outcome: RequestOutcome;
+    /** Outcome token for the consumer to localize; null while open. */
+    label: string | null;
+    params?: Record<string, any> | undefined;
+}
+type UnpromptedChangeType = 'quantity' | 'price' | 'swap' | 'add' | 'remove';
+/** A change nobody asked for, derived by diffing the current items against the
+ *  latest transmitted baseline. Reverting the edit makes the entry disappear. */
+interface UnpromptedChange {
+    type: UnpromptedChangeType;
+    lineId: string;
+    /** Current item (absent for 'remove'). */
+    item?: OfferItem | undefined;
+    /** Baseline line (absent for 'add'). */
+    baseline?: BaselineLine | undefined;
+    from?: number | undefined;
+    to?: number | undefined;
+    /** Previous wine title, for 'swap'. */
+    fromTitle?: string | undefined;
+}
+declare function itemByLineId(view: NegotiationOfferView, lineId: string | null): OfferItem | undefined;
+/** The offer as last transmitted — deltas and unprompted changes derive
+ *  against this. Undefined before the first send. */
+declare function latestBaseline(view: NegotiationOfferView): NegotiationBaseline | undefined;
+/** Snapshot the current items into a baseline. Called at send time. */
+declare function buildBaseline(view: NegotiationOfferView, totalPrice: number): NegotiationBaseline;
+/**
+ * Derive one request's outcome from the live offer (§4.1 of the handoff).
+ * An explicit decline always wins; everything else is read off the wine list.
+ */
+declare function resolveRequest(request: ChangeRequest, view: NegotiationOfferView): ResolvedRequest;
+/** Resolve the whole live round, in stored (offer) order. */
+declare function resolveRequests(view: NegotiationOfferView): ResolvedRequest[];
+declare function countOpenRequests(view: NegotiationOfferView): number;
+/**
+ * Changes nobody asked for: the diff between current items and the latest
+ * baseline, minus anything a live request explains (a request targeting that
+ * lineId, or — for additions — any pending 'add'/'replace' ask).
+ */
+declare function deriveUnpromptedChanges(view: NegotiationOfferView): UnpromptedChange[];
+
+export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_OFFER_STATUS, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, type RequestKind, type RequestOutcome, type ResolvedRequest, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, sortItems, validateCategoryName };
