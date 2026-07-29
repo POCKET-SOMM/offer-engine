@@ -51,11 +51,26 @@ export function itemByLineId(view: NegotiationOfferView, lineId: string | null):
     return view.items.find((item) => item.lineId === lineId);
 }
 
-/** The offer as last transmitted — deltas and unprompted changes derive
- *  against this. Undefined before the first send. */
+/** The offer as last transmitted. Undefined before the first send. */
 export function latestBaseline(view: NegotiationOfferView): NegotiationBaseline | undefined {
     const versions = view.negotiation?.versions;
     return versions?.length ? versions[versions.length - 1]!.baseline : undefined;
+}
+
+/** The offer as it stood when the live round OPENED — the anchor request
+ *  deltas and unprompted changes derive against. This is the baseline of the
+ *  buyer transmission that carried the live requests; it matters after the
+ *  seller answers (requests survive that send so the buyer can read the
+ *  receipt), when the *latest* baseline already contains the answers.
+ *  Falls back to the latest baseline when no round is live. */
+export function roundBaseline(view: NegotiationOfferView): NegotiationBaseline | undefined {
+    const neg = view.negotiation;
+    const versionId = neg?.requests?.[0]?.versionId;
+    if (versionId) {
+        const opening = neg!.versions.find((v) => v.id === versionId);
+        if (opening) return opening.baseline;
+    }
+    return latestBaseline(view);
 }
 
 /** Snapshot the current items into a baseline. Called at send time. */
@@ -101,7 +116,7 @@ export function resolveRequest(request: ChangeRequest, view: NegotiationOfferVie
         }
         case 'replace': {
             if (!item) return { request, outcome: 'changed', label: 'droppedNoReplacement' };
-            const baselineLine = latestBaseline(view)?.lines.find((l) => l.lineId === request.lineId);
+            const baselineLine = roundBaseline(view)?.lines.find((l) => l.lineId === request.lineId);
             const swapped = baselineLine && wineIdOf(item) !== baselineLine.wineId;
             if (swapped) {
                 return { request, outcome: 'done', label: 'swappedFor', params: { title: item.data?.['title'] ?? '' } };
@@ -109,7 +124,7 @@ export function resolveRequest(request: ChangeRequest, view: NegotiationOfferVie
             return { request, outcome: 'open', label: null };
         }
         case 'add': {
-            const baseline = latestBaseline(view);
+            const baseline = roundBaseline(view);
             const baselineIds = new Set((baseline?.lines ?? []).map((l) => l.lineId));
             const added = view.items.filter((i) => !baselineIds.has(i.lineId));
             // A concrete wine ask is met by that wine; a free-text ask by any
@@ -146,15 +161,23 @@ export function countOpenRequests(view: NegotiationOfferView): number {
 }
 
 /**
- * Changes nobody asked for: the diff between current items and the latest
- * baseline, minus anything a live request explains (a request targeting that
- * lineId, or — for additions — any pending 'add'/'replace' ask).
+ * Changes nobody asked for: the diff between current items and the round's
+ * opening baseline, minus anything a live request explains (a request
+ * targeting that lineId, or — for additions — any pending 'add' ask).
+ *
+ * `opts.baseline` overrides the anchor (e.g. the latest baseline, to ask
+ * "what changed since the last transmission?"); `opts.ignoreRequests` skips
+ * the request-explains-it exclusion, which only makes sense against the
+ * round anchor.
  */
-export function deriveUnpromptedChanges(view: NegotiationOfferView): UnpromptedChange[] {
-    const baseline = latestBaseline(view);
+export function deriveUnpromptedChanges(
+    view: NegotiationOfferView,
+    opts: { baseline?: NegotiationBaseline; ignoreRequests?: boolean } = {},
+): UnpromptedChange[] {
+    const baseline = opts.baseline ?? roundBaseline(view);
     if (!baseline) return [];
 
-    const requests = view.negotiation?.requests ?? [];
+    const requests = opts.ignoreRequests ? [] : (view.negotiation?.requests ?? []);
     const requestedLineIds = new Set(requests.map((r) => r.lineId).filter((id): id is string => id != null));
     const hasAddRequests = requests.some((r) => r.kind === 'add');
 

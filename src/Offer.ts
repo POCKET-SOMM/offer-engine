@@ -303,7 +303,11 @@ export class Offer {
     /**
      * Seller transmission: record a version of the offer as it stands (initial
      * share and every answer round). Freezes the caller-composed log, snapshots
-     * the baseline, clears the answered round, and passes the turn.
+     * the baseline, and passes the turn. The answered round's requests (and the
+     * seller's unprompted notes) deliberately SURVIVE this send — they are what
+     * the buyer reads as her receipt; they're replaced by her next
+     * submitRequests. Derivation stays anchored to the round-opening baseline
+     * (roundBaseline), so outcomes keep reading correctly after the send.
      * `sentAt` is caller-supplied so the engine stays deterministic.
      */
     sendVersion({ senderName, sentAt, log = [] }: {
@@ -322,7 +326,7 @@ export class Offer {
             baseline: buildBaseline(this, this.totals.totalPrice),
         };
         return this._withNegotiation(
-            { ...neg, versions: [...neg.versions, version], requests: [], unpromptedNotes: {}, turn: 'buyer' },
+            { ...neg, versions: [...neg.versions, version], turn: 'buyer' },
             { status: 'sent' },
         );
     }

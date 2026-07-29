@@ -373,7 +373,11 @@ declare class Offer {
     /**
      * Seller transmission: record a version of the offer as it stands (initial
      * share and every answer round). Freezes the caller-composed log, snapshots
-     * the baseline, clears the answered round, and passes the turn.
+     * the baseline, and passes the turn. The answered round's requests (and the
+     * seller's unprompted notes) deliberately SURVIVE this send — they are what
+     * the buyer reads as her receipt; they're replaced by her next
+     * submitRequests. Derivation stays anchored to the round-opening baseline
+     * (roundBaseline), so outcomes keep reading correctly after the send.
      * `sentAt` is caller-supplied so the engine stays deterministic.
      */
     sendVersion({ senderName, sentAt, log }: {
@@ -568,9 +572,15 @@ interface UnpromptedChange {
     fromTitle?: string | undefined;
 }
 declare function itemByLineId(view: NegotiationOfferView, lineId: string | null): OfferItem | undefined;
-/** The offer as last transmitted — deltas and unprompted changes derive
- *  against this. Undefined before the first send. */
+/** The offer as last transmitted. Undefined before the first send. */
 declare function latestBaseline(view: NegotiationOfferView): NegotiationBaseline | undefined;
+/** The offer as it stood when the live round OPENED — the anchor request
+ *  deltas and unprompted changes derive against. This is the baseline of the
+ *  buyer transmission that carried the live requests; it matters after the
+ *  seller answers (requests survive that send so the buyer can read the
+ *  receipt), when the *latest* baseline already contains the answers.
+ *  Falls back to the latest baseline when no round is live. */
+declare function roundBaseline(view: NegotiationOfferView): NegotiationBaseline | undefined;
 /** Snapshot the current items into a baseline. Called at send time. */
 declare function buildBaseline(view: NegotiationOfferView, totalPrice: number): NegotiationBaseline;
 /**
@@ -582,10 +592,18 @@ declare function resolveRequest(request: ChangeRequest, view: NegotiationOfferVi
 declare function resolveRequests(view: NegotiationOfferView): ResolvedRequest[];
 declare function countOpenRequests(view: NegotiationOfferView): number;
 /**
- * Changes nobody asked for: the diff between current items and the latest
- * baseline, minus anything a live request explains (a request targeting that
- * lineId, or — for additions — any pending 'add'/'replace' ask).
+ * Changes nobody asked for: the diff between current items and the round's
+ * opening baseline, minus anything a live request explains (a request
+ * targeting that lineId, or — for additions — any pending 'add' ask).
+ *
+ * `opts.baseline` overrides the anchor (e.g. the latest baseline, to ask
+ * "what changed since the last transmission?"); `opts.ignoreRequests` skips
+ * the request-explains-it exclusion, which only makes sense against the
+ * round anchor.
  */
-declare function deriveUnpromptedChanges(view: NegotiationOfferView): UnpromptedChange[];
+declare function deriveUnpromptedChanges(view: NegotiationOfferView, opts?: {
+    baseline?: NegotiationBaseline;
+    ignoreRequests?: boolean;
+}): UnpromptedChange[];
 
-export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_OFFER_STATUS, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, type RequestKind, type RequestOutcome, type ResolvedRequest, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, sortItems, validateCategoryName };
+export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_OFFER_STATUS, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, type RequestKind, type RequestOutcome, type ResolvedRequest, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, roundBaseline, sortItems, validateCategoryName };

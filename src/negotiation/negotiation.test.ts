@@ -96,16 +96,42 @@ describe('flow: sendVersion / submitRequests', () => {
         expect(req.declined).toBe(false);
     });
 
-    it('the seller answer round clears requests and unprompted notes', () => {
+    it('the seller answer round keeps the requests as the buyer’s receipt', () => {
         let offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
-        offer = offer.setQuantity(20, ['a']).setUnpromptedNote('b', 'price holds');
-        offer = offer.sendVersion({ sentAt: SENT_AT, log: [{ text: 'Set to 20 cases' }] });
+        offer = offer.setQuantity(18, ['a']).setUnpromptedNote('b', 'price holds');
+        offer = offer.sendVersion({ sentAt: SENT_AT, log: [{ text: 'Set to 18 instead' }] });
         const neg = offer.negotiation!;
         expect(neg.versions).toHaveLength(3);
-        expect(neg.requests).toHaveLength(0);
-        expect(neg.unpromptedNotes).toEqual({});
         expect(neg.turn).toBe('buyer');
-        expect(neg.versions[2]!.log).toEqual([{ text: 'Set to 20 cases' }]);
+        expect(neg.versions[2]!.log).toEqual([{ text: 'Set to 18 instead' }]);
+        // Requests + notes survive the send (the buyer reads them as the
+        // receipt), and outcomes still derive correctly because they anchor to
+        // the round-opening baseline, not the just-sent one.
+        expect(neg.requests).toHaveLength(1);
+        expect(neg.unpromptedNotes).toEqual({ b: 'price holds' });
+        expect(resolveRequest(neg.requests[0]!, offer)).toMatchObject({
+            outcome: 'changed', label: 'setToInstead', params: { qty: 18 },
+        });
+    });
+
+    it('a replace answered by a swap still reads done after the seller sends', () => {
+        let offer = negotiatingOffer([{ kind: 'replace', lineId: 'c' }]);
+        offer = offer.swapItem('c', { id: 'z', price: 25, data: { id: 'wine-z', title: 'Dolcetto' } });
+        offer = offer.sendVersion({ sentAt: SENT_AT });
+        expect(resolveRequest(liveRequest(offer), offer)).toMatchObject({
+            outcome: 'done', label: 'swappedFor', params: { title: 'Dolcetto' },
+        });
+    });
+
+    it('the buyer’s next round replaces the previous requests and notes', () => {
+        let offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
+        offer = offer.setQuantity(20, ['a']).setUnpromptedNote('b', 'price holds');
+        offer = offer.sendVersion({ sentAt: SENT_AT });
+        offer = offer.submitRequests({ sentAt: SENT_AT, requests: [{ kind: 'remove', lineId: 'b' }] });
+        const neg = offer.negotiation!;
+        expect(neg.requests).toHaveLength(1);
+        expect(neg.requests[0]!.kind).toBe('remove');
+        expect(neg.unpromptedNotes).toEqual({});
     });
 
     it('acceptNegotiation ends the conversation and sets offer status', () => {
@@ -257,6 +283,19 @@ describe('deriveUnpromptedChanges', () => {
         let offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
         offer = offer.setQuantity(18, ['a']); // answers the request — not unprompted
         expect(deriveUnpromptedChanges(offer)).toEqual([]);
+    });
+
+    it('stays visible to the buyer after the seller sends (round anchor)', () => {
+        let offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
+        offer = offer.setQuantity(20, ['a']).setQuantity(9, ['b']);
+        offer = offer.sendVersion({ sentAt: SENT_AT });
+        const changes = deriveUnpromptedChanges(offer);
+        expect(changes).toHaveLength(1);
+        expect(changes[0]).toMatchObject({ type: 'quantity', lineId: 'b', from: 5, to: 9 });
+        // …while "changed since the last transmission" is clean.
+        expect(deriveUnpromptedChanges(offer, {
+            baseline: latestBaseline(offer), ignoreRequests: true,
+        })).toEqual([]);
     });
 
     it('excludes additions while an add request is pending', () => {

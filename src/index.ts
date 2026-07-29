@@ -43,6 +43,7 @@ export {
     deriveUnpromptedChanges,
     itemByLineId,
     latestBaseline,
+    roundBaseline,
     buildBaseline,
 } from './negotiation/derive.js';
 export { NEGOTIATION_PARTIES, REQUEST_KINDS, REQUEST_OUTCOMES } from './negotiation/types.js';
