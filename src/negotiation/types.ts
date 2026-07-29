@@ -77,8 +77,13 @@ export interface ChangeRequest {
     lineId: string | null;
     /** Quantity as it stood when the round arrived — the "10" in "10 → 20". */
     from: number | null;
+    /** Unit as it stood when the round arrived (pairs with `from`). */
+    fromUnit: string | null;
     /** Requested quantity ('quantity' kind only). */
     to: number | null;
+    /** Requested unit ('quantity' kind only) — lets an ask change unit, e.g.
+     *  "10 bottles → 10 cases". Pairs with `to`; falls back to `fromUnit`. */
+    toUnit: string | null;
     /** Requested wine for 'replace'/'add', in the consumer's wine shape. */
     wine: Record<string, any> | null;
     /** The requester's note. */
@@ -98,6 +103,8 @@ export interface ChangeRequestInput {
     kind: RequestKind;
     lineId?: string | null | undefined;
     to?: number | null | undefined;
+    /** Requested unit; defaults to the target line's current unit when omitted. */
+    toUnit?: string | null | undefined;
     wine?: Record<string, any> | null | undefined;
     note?: string | null | undefined;
 }

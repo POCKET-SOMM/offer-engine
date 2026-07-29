@@ -91,36 +91,78 @@ export function buildBaseline(view: NegotiationOfferView, totalPrice: number): N
 
 /**
  * Derive one request's outcome from the live offer (§4.1 of the handoff).
+ *
  * An explicit decline always wins; everything else is read off the wine list.
+ * The request is compared against the round-opening baseline line across ALL
+ * dimensions (quantity, unit, wine identity, price), so that answering an ask
+ * with a *different kind* of change is never lost: e.g. a swap request the
+ * seller answers by cutting the volume reports `changed` (volumeInstead)
+ * rather than sitting `open` while the volume change vanishes. The dimension
+ * the request actually asked about wins when it's satisfied.
  */
 export function resolveRequest(request: ChangeRequest, view: NegotiationOfferView): ResolvedRequest {
     if (request.declined) return { request, outcome: 'declined', label: 'declined' };
 
     const item = itemByLineId(view, request.lineId);
+    const baselineLine = roundBaseline(view)?.lines.find((l) => l.lineId === request.lineId);
+
+    // What changed on this line vs. how it stood when the round opened. Used as
+    // the cross-dimension fallback for every line-targeting request kind.
+    const swapped = !!item && !!baselineLine && wineIdOf(item) !== baselineLine.wineId;
+    const qtyChanged = !!item && !!baselineLine
+        && (item.quantity !== baselineLine.quantity || item.unit !== baselineLine.unit);
+    const priceChanged = !!item && !!baselineLine && item.pricePerUnit !== baselineLine.pricePerUnit;
+
+    const unitParams = (i: OfferItem) => ({ qty: i.quantity, unit: i.unit });
+
+    // The outcome for a line touched on a dimension the request didn't ask
+    // about (or asked about but wasn't met the requested way). null = nothing
+    // else changed, so the caller can fall through to `open`.
+    const crossDimensionOutcome = (): ResolvedRequest | null => {
+        if (!item) return null;
+        if (swapped) {
+            return { request, outcome: 'changed', label: 'swappedInstead', params: { title: item.data?.['title'] ?? '' } };
+        }
+        if (qtyChanged) {
+            return { request, outcome: 'changed', label: 'volumeInstead', params: unitParams(item) };
+        }
+        if (priceChanged) return { request, outcome: 'changed', label: 'priceInstead' };
+        return null;
+    };
 
     switch (request.kind) {
         case 'quantity': {
             if (!item) return { request, outcome: 'changed', label: 'removedInstead' };
-            if (item.quantity === request.to) return { request, outcome: 'done', label: 'doneAsAsked' };
-            if (item.quantity !== request.from) {
-                return { request, outcome: 'changed', label: 'setToInstead', params: { qty: item.quantity } };
+            const toUnit = request.toUnit ?? request.fromUnit;
+            if (item.quantity === request.to && (toUnit == null || item.unit === toUnit)) {
+                return { request, outcome: 'done', label: 'doneAsAsked' };
             }
-            return { request, outcome: 'open', label: null };
+            // Quantity/unit moved, just not to exactly what was asked.
+            if (qtyChanged) {
+                return { request, outcome: 'changed', label: 'setToInstead', params: unitParams(item) };
+            }
+            // The quantity is untouched but the line changed another way.
+            return crossDimensionOutcome() ?? { request, outcome: 'open', label: null };
         }
         case 'remove': {
             if (!item || item.quantity === 0) return { request, outcome: 'done', label: 'removed' };
-            if (item.quantity !== request.from) {
-                return { request, outcome: 'changed', label: 'cutToInstead', params: { qty: item.quantity } };
+            // Cut down but kept — a partial answer to the removal.
+            if (item.quantity !== baselineLine?.quantity || item.unit !== baselineLine?.unit) {
+                return { request, outcome: 'changed', label: 'cutToInstead', params: unitParams(item) };
             }
-            return { request, outcome: 'open', label: null };
+            return crossDimensionOutcome() ?? { request, outcome: 'open', label: null };
         }
         case 'replace': {
             if (!item) return { request, outcome: 'changed', label: 'droppedNoReplacement' };
-            const baselineLine = roundBaseline(view)?.lines.find((l) => l.lineId === request.lineId);
-            const swapped = baselineLine && wineIdOf(item) !== baselineLine.wineId;
             if (swapped) {
                 return { request, outcome: 'done', label: 'swappedFor', params: { title: item.data?.['title'] ?? '' } };
             }
+            // No swap, but the seller adjusted the line another way (the §2
+            // lost-strand case: asked to swap, answered with a volume cut).
+            if (qtyChanged) {
+                return { request, outcome: 'changed', label: 'volumeInstead', params: unitParams(item) };
+            }
+            if (priceChanged) return { request, outcome: 'changed', label: 'priceInstead' };
             return { request, outcome: 'open', label: null };
         }
         case 'add': {

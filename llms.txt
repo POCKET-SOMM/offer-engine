@@ -94,9 +94,18 @@ and `unpromptedNotes` (seller notes keyed by lineId).
 - **Outcomes are derived, never stored.** `resolveRequest(request, offer)` returns
   `{ outcome: 'open'|'done'|'changed'|'declined', label, params }` — label is an i18n token
   (`doneAsAsked`, `setToInstead`, `cutToInstead`, `swappedFor`, `droppedNoReplacement`,
-  `removedInstead`, `removed`, `added`, `answered`, `declined`). Editing the wine list by hand
-  settles a request identically to any sidebar shortcut. The only stored resolution state:
+  `removedInstead`, `removed`, `added`, `answered`, `declined`, plus the cross-dimension
+  `volumeInstead`, `swappedInstead`, `priceInstead`). Editing the wine list by hand settles a
+  request identically to any sidebar shortcut. The only stored resolution state:
   `declined`, `answerNote`, `answeredFreeText` (for free-text asks with nothing to derive from).
+- **Cross-dimension answers never vanish.** A request is compared to the round-opening baseline
+  across ALL dimensions (quantity, unit, wine identity, price). Answering an ask with a *different*
+  kind of change is reported as `changed` on the request itself — e.g. a `replace` the seller
+  answers by cutting the volume → `changed`/`volumeInstead` (not a stuck `open`). The requested
+  dimension wins when it's actually satisfied.
+- **Units are tracked.** A `quantity` request carries `fromUnit`/`toUnit` (`toUnit` defaults to the
+  line's current unit), so "10 bottles → 10 cases" is expressible; `done` requires both the
+  quantity AND unit to match. `params` on quantity outcomes is `{ qty, unit }`.
 - **Unprompted changes are derived too**: `deriveUnpromptedChanges(offer)` diffs current items vs
   the latest version's baseline (quantity/price/swap/add/remove), excluding edits a live request
   explains. Reverting the edit removes the entry.

@@ -353,19 +353,27 @@ export class Offer {
             log,
             baseline: buildBaseline(this, this.totals.totalPrice),
         };
-        const stamped: ChangeRequest[] = requests.map((input) => ({
-            id: crypto.randomUUID(),
-            versionId,
-            kind: input.kind,
-            lineId: input.lineId ?? null,
-            from: input.lineId != null ? (itemByLineId(this, input.lineId)?.quantity ?? null) : null,
-            to: input.to ?? null,
-            wine: input.wine ?? null,
-            note: input.note ?? null,
-            declined: false,
-            answerNote: null,
-            answeredFreeText: false,
-        }));
+        const stamped: ChangeRequest[] = requests.map((input) => {
+            const target = input.lineId != null ? itemByLineId(this, input.lineId) : undefined;
+            const fromUnit = target?.unit ?? null;
+            return {
+                id: crypto.randomUUID(),
+                versionId,
+                kind: input.kind,
+                lineId: input.lineId ?? null,
+                from: target?.quantity ?? null,
+                fromUnit,
+                to: input.to ?? null,
+                // Default the requested unit to the line's current unit, so a
+                // quantity-only ask ("10 → 20") keeps the same unit.
+                toUnit: input.toUnit ?? fromUnit,
+                wine: input.wine ?? null,
+                note: input.note ?? null,
+                declined: false,
+                answerNote: null,
+                answeredFreeText: false,
+            };
+        });
         return this._withNegotiation({
             ...neg,
             versions: [...neg.versions, version],

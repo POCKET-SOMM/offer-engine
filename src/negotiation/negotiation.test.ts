@@ -28,6 +28,7 @@ const negotiatingOffer = (requests: Array<Partial<ChangeRequest> & { kind: Chang
             kind: r.kind,
             lineId: r.lineId,
             to: r.to,
+            toUnit: r.toUnit,
             wine: r.wine,
             note: r.note,
         })),
@@ -206,6 +207,40 @@ describe('resolveRequest — §4.1 derivation table', () => {
         expect(resolveRequest(liveRequest(offer), offer)).toMatchObject({ outcome: 'changed', label: 'droppedNoReplacement' });
     });
 
+    it('replace answered by a volume cut → changed (volumeInstead), not lost', () => {
+        // The §2 lost-strand case: buyer asks for a swap, seller keeps the wine
+        // but cuts the volume. Must surface, and must not gate Send.
+        let offer = negotiatingOffer([{ kind: 'replace', lineId: 'c', note: 'swap or just cut it' }]);
+        offer = offer.setQuantity(1, ['c']);
+        const resolved = resolveRequest(liveRequest(offer), offer);
+        expect(resolved).toMatchObject({ outcome: 'changed', label: 'volumeInstead', params: { qty: 1 } });
+        expect(countOpenRequests(offer)).toBe(0);
+    });
+
+    it('replace answered by a price change → changed (priceInstead)', () => {
+        let offer = negotiatingOffer([{ kind: 'replace', lineId: 'c' }]);
+        offer = offer.updateItem('c', { price: 40 });
+        expect(resolveRequest(liveRequest(offer), offer)).toMatchObject({ outcome: 'changed', label: 'priceInstead' });
+    });
+
+    it('quantity answered by a swap → changed (swappedInstead)', () => {
+        let offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
+        // Same quantity, different wine — the swap must not be swallowed by the
+        // quantity request sitting open.
+        offer = offer.swapItem('a', { id: 'z', price: 10, quantity: 10, data: { id: 'wine-z', title: 'Nero' } });
+        expect(resolveRequest(liveRequest(offer), offer)).toMatchObject({
+            outcome: 'changed', label: 'swappedInstead', params: { title: 'Nero' },
+        });
+    });
+
+    it('remove answered by a swap → changed (swappedInstead)', () => {
+        let offer = negotiatingOffer([{ kind: 'remove', lineId: 'b' }]);
+        offer = offer.swapItem('b', { id: 'z', price: 20, quantity: 5, data: { id: 'wine-z', title: 'Nero' } });
+        expect(resolveRequest(liveRequest(offer), offer)).toMatchObject({
+            outcome: 'changed', label: 'swappedInstead',
+        });
+    });
+
     it('add with a target wine: settled only by that wine', () => {
         let offer = negotiatingOffer([{ kind: 'add', wine: { id: 'wine-x', title: 'Lambrusco' } }]);
         offer = offer.addItems([{ id: 'other', price: 12, data: { id: 'wine-y' } }]);
@@ -230,6 +265,28 @@ describe('resolveRequest — §4.1 derivation table', () => {
         expect(resolveRequest(liveRequest(offer), offer).outcome).toBe('open');
         const answered = offer.setRequestAnswer(liveRequest(offer).id, 'Yes, certified.');
         expect(resolveRequest(liveRequest(answered), answered).outcome).toBe('done');
+    });
+
+    it('unit-aware: a "10 btl → 10 cs" ask is done only when the unit also matches', () => {
+        // A line that can be ordered by bottle or case_6.
+        const withCases = new Offer({ title: 'Test' }).addItems([
+            { id: 'u', price: 10, quantity: 10, unit: 'bottle', availableUnits: ['bottle', 'case_6'], data: { id: 'wine-u', title: 'Chablis' } },
+        ]).sendVersion({ sentAt: SENT_AT });
+        const offer = withCases.submitRequests({
+            sentAt: SENT_AT,
+            requests: [{ kind: 'quantity', lineId: 'u', to: 10, toUnit: 'case_6' }],
+        });
+        const req = liveRequest(offer);
+        expect(req.fromUnit).toBe('bottle');
+        expect(req.toUnit).toBe('case_6');
+        // Untouched (still 10 bottles) → open; the ask isn't met yet.
+        expect(resolveRequest(req, offer).outcome).toBe('open');
+        // Same number but still bottles → not done (unit differs) — a change.
+        const stillBottles = offer.updateItem('u', { quantity: 12 });
+        expect(resolveRequest(liveRequest(stillBottles), stillBottles).outcome).toBe('changed');
+        // Switch to exactly 10 cases → done.
+        const cased = offer.updateItem('u', { quantity: 10, unit: 'case_6' });
+        expect(resolveRequest(liveRequest(cased), cased)).toMatchObject({ outcome: 'done', label: 'doneAsAsked' });
     });
 
     it('declined always wins, and undecline restores derivation', () => {
