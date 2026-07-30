@@ -101,8 +101,11 @@ and `unpromptedNotes` (seller notes keyed by lineId).
 - **Cross-dimension answers never vanish.** A request is compared to the round-opening baseline
   across ALL dimensions (quantity, unit, wine identity, price). Answering an ask with a *different*
   kind of change is reported as `changed` on the request itself — e.g. a `replace` the seller
-  answers by cutting the volume → `changed`/`volumeInstead` (not a stuck `open`). The requested
-  dimension wins when it's actually satisfied.
+  answers by cutting the volume → `changed`/`volumeInstead` (not a stuck `open`). This includes a
+  `note` (a question) answered *by acting* — swapping the noted wine settles the note and names the
+  swap, rather than leaving it stuck open. The requested dimension wins when it's actually satisfied.
+- **Baseline carries `imgUrl`.** Each baseline line stores the wine's thumbnail, so a consumer can
+  keep showing the wine a request was *about* even after that line is swapped for a different wine.
 - **Units are tracked.** A `quantity` request carries `fromUnit`/`toUnit` (`toUnit` defaults to the
   line's current unit), so "10 bottles → 10 cases" is expressible; `done` requires both the
   quantity AND unit to match. `params` on quantity outcomes is `{ qty, unit }`.

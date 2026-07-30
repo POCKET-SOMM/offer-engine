@@ -13,7 +13,7 @@ const SENT_AT = '2026-07-29T12:00:00.000Z';
 
 // A 3-line offer with catalogue ids on data — the shape the app stores.
 const baseOffer = () => new Offer({ title: 'Test' }).addItems([
-    { id: 'a', price: 10, quantity: 10, data: { id: 'wine-a', title: 'Muga Reserva' } },
+    { id: 'a', price: 10, quantity: 10, data: { id: 'wine-a', title: 'Muga Reserva', imgUrl: 'muga.png' } },
     { id: 'b', price: 20, quantity: 5, data: { id: 'wine-b', title: 'Soave Classico' } },
     { id: 'c', price: 30, quantity: 2, data: { id: 'wine-c', title: 'Barolo' } },
 ]);
@@ -79,6 +79,7 @@ describe('flow: sendVersion / submitRequests', () => {
         expect(neg.versions[0]!.number).toBe(1);
         expect(neg.versions[0]!.sender).toBe('seller');
         expect(neg.versions[0]!.baseline.lines).toHaveLength(3);
+        expect(neg.versions[0]!.baseline.lines[0]!.imgUrl).toBe('muga.png');
         expect(neg.versions[0]!.baseline.totals.totalPrice).toBe(offer.totals.totalPrice);
         expect(neg.turn).toBe('buyer');
         expect(offer.status).toBe('sent');
@@ -265,6 +266,23 @@ describe('resolveRequest — §4.1 derivation table', () => {
         expect(resolveRequest(liveRequest(offer), offer).outcome).toBe('open');
         const answered = offer.setRequestAnswer(liveRequest(offer).id, 'Yes, certified.');
         expect(resolveRequest(liveRequest(answered), answered).outcome).toBe('done');
+    });
+
+    it('note answered by a swap → handled (not lost, not gating send)', () => {
+        // "is this out of stock?" answered by replacing the wine.
+        let offer = negotiatingOffer([{ kind: 'note', lineId: 'a', note: 'is this out of stock?' }]);
+        expect(countOpenRequests(offer)).toBe(1);
+        offer = offer.swapItem('a', { id: 'z', price: 10, quantity: 10, data: { id: 'wine-z', title: 'Nero' } });
+        expect(resolveRequest(liveRequest(offer), offer)).toMatchObject({
+            outcome: 'changed', label: 'swappedInstead', params: { title: 'Nero' },
+        });
+        expect(countOpenRequests(offer)).toBe(0);
+    });
+
+    it('note answered by removing the line → done (removed)', () => {
+        let offer = negotiatingOffer([{ kind: 'note', lineId: 'b', note: 'still available?' }]);
+        offer = offer.removeItems(['b']);
+        expect(resolveRequest(liveRequest(offer), offer)).toMatchObject({ outcome: 'done', label: 'removed' });
     });
 
     it('unit-aware: a "10 btl → 10 cs" ask is done only when the unit also matches', () => {

@@ -81,6 +81,7 @@ export function buildBaseline(view: NegotiationOfferView, totalPrice: number): N
             lineId: item.lineId,
             wineId: wineIdOf(item),
             title: item.data?.['title'] ?? '',
+            imgUrl: item.data?.['imgUrl'],
             quantity: item.quantity,
             unit: item.unit,
             pricePerUnit: item.pricePerUnit,
@@ -181,10 +182,17 @@ export function resolveRequest(request: ChangeRequest, view: NegotiationOfferVie
             return { request, outcome: 'open', label: null };
         }
         case 'note': {
-            // Nothing in the wine list can settle a free-text ask — replying to
-            // it (or explicitly marking it answered) is what settles it.
+            // An explicit reply (answer note / marked answered) settles a note.
             if (request.answeredFreeText || (request.answerNote && request.answerNote.trim())) {
                 return { request, outcome: 'done', label: 'answered' };
+            }
+            // A note is a question the rep can answer *by acting* on the line —
+            // e.g. "is this out of stock?" answered by swapping the wine. Reflect
+            // that change so it isn't lost and the note stops gating Send.
+            if (request.lineId != null) {
+                if (!item) return { request, outcome: 'done', label: 'removed' };
+                const acted = crossDimensionOutcome();
+                if (acted) return acted;
             }
             return { request, outcome: 'open', label: null };
         }

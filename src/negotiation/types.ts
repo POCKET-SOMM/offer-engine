@@ -36,6 +36,9 @@ export interface BaselineLine {
     /** The wine's catalogue id (item.data.id), used to detect swaps. */
     wineId: string | null;
     title: string;
+    /** The wine's thumbnail, so a request row can keep showing the wine it was
+     *  about even after the line is swapped for a different one. */
+    imgUrl?: string | undefined;
     quantity: number;
     unit: string;
     pricePerUnit: number;
