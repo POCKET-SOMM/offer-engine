@@ -413,6 +413,34 @@ export class Offer {
         return this._withNegotiation({ ...neg, unpromptedNotes });
     }
 
+    /**
+     * Whether the initial share can still be pulled back: the seller has sent
+     * once, nothing has come back, and the offer isn't accepted. Deliberately
+     * narrow — a later transmission can't be withdrawn, because the round it
+     * answered (or, for a buyer round, the requests it replaced) is not
+     * recoverable from what the version record keeps.
+     */
+    get canWithdrawShare(): boolean {
+        const neg = this.negotiation;
+        if (!neg || neg.state !== 'open') return false;
+        return neg.versions.length === 1
+            && neg.versions[0]!.sender === 'seller'
+            && neg.requests.length === 0;
+    }
+
+    /**
+     * Undo the initial share: the conversation is dropped whole and the offer
+     * goes back to being a draft, as if it had never been sent. The wine list
+     * is untouched — withdrawing pulls back the transmission, not the edits
+     * made since. A no-op unless `canWithdrawShare`.
+     */
+    withdrawShare(): Offer {
+        if (!this.canWithdrawShare) return this;
+        const data: Record<string, any> = { ...this.data, status: 'draft' };
+        delete data['negotiation'];
+        return new Offer({ ...this, data });
+    }
+
     /** Buyer accepts the offer as it stands. Ends the conversation. */
     acceptNegotiation(): Offer {
         const neg = this._negotiationOrFresh();

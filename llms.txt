@@ -117,6 +117,11 @@ and `unpromptedNotes` (seller notes keyed by lineId).
   `submitRequests({ requests, senderName, sentAt })` (buyer; stamps `from` off current lines),
   `declineRequest/undeclineRequest(id)`, `setRequestAnswer(id, note)`,
   `markFreeTextAnswered(id)`, `setUnpromptedNote(lineId, note)`, `acceptNegotiation()`.
+- **Withdrawing the initial share**: `canWithdrawShare` (getter) + `withdrawShare()` un-send v1 —
+  the negotiation is dropped whole and status returns to `'draft'`, as if it had never been sent.
+  Items are untouched (edits made since survive). Deliberately limited to a lone, unanswered
+  seller version: nothing later can be withdrawn, because the round it answered — or, for a buyer
+  round, the requests it replaced — is not recoverable from the version record. No-op otherwise.
 - Helpers: `resolveRequests`, `countOpenRequests`, `itemByLineId`, `latestBaseline`.
 - `toSummary()` embeds `negotiation: { state, turn, openCount, versionCount }` once shared — list
   rows badge "Your move" / "Their move" / "Approved" without loading items.

@@ -416,6 +416,21 @@ declare class Offer {
     /** Seller note on an unprompted change, keyed by the line it touches. The
      *  change itself is derived; only the note needs storage. */
     setUnpromptedNote(lineId: string, note: string): Offer;
+    /**
+     * Whether the initial share can still be pulled back: the seller has sent
+     * once, nothing has come back, and the offer isn't accepted. Deliberately
+     * narrow — a later transmission can't be withdrawn, because the round it
+     * answered (or, for a buyer round, the requests it replaced) is not
+     * recoverable from what the version record keeps.
+     */
+    get canWithdrawShare(): boolean;
+    /**
+     * Undo the initial share: the conversation is dropped whole and the offer
+     * goes back to being a draft, as if it had never been sent. The wine list
+     * is untouched — withdrawing pulls back the transmission, not the edits
+     * made since. A no-op unless `canWithdrawShare`.
+     */
+    withdrawShare(): Offer;
     /** Buyer accepts the offer as it stands. Ends the conversation. */
     acceptNegotiation(): Offer;
     private _withGrouping;

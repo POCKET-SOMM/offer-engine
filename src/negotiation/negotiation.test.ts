@@ -150,6 +150,50 @@ describe('flow: sendVersion / submitRequests', () => {
     });
 });
 
+describe('withdrawShare', () => {
+    it('drops the conversation whole and returns the offer to draft', () => {
+        const sent = baseOffer().sendVersion({ sentAt: SENT_AT, senderName: 'You' });
+        const withdrawn = sent.withdrawShare();
+        expect(withdrawn.negotiation).toBeUndefined();
+        expect(withdrawn.status).toBe('draft');
+        expect(withdrawn.items).toHaveLength(3);
+    });
+
+    it('keeps edits made since the send — it pulls back the transmission, not the offer', () => {
+        const sent = baseOffer().sendVersion({ sentAt: SENT_AT });
+        const withdrawn = sent.setQuantity(4, ['a']).withdrawShare();
+        expect(withdrawn.negotiation).toBeUndefined();
+        expect(withdrawn.items[0]!.quantity).toBe(4);
+    });
+
+    it('leaves no trace in a toJSON round-trip', () => {
+        const withdrawn = baseOffer().sendVersion({ sentAt: SENT_AT }).withdrawShare();
+        const reloaded = new Offer({ ...withdrawn.toJSON(), items: [] });
+        expect(reloaded.negotiation).toBeUndefined();
+        expect(reloaded.status).toBe('draft');
+    });
+
+    it('is unavailable once the buyer has responded', () => {
+        const offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
+        expect(offer.canWithdrawShare).toBe(false);
+        expect(offer.withdrawShare()).toBe(offer);
+    });
+
+    it('is unavailable for a later seller version', () => {
+        let offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
+        offer = offer.setQuantity(20, ['a']).sendVersion({ sentAt: SENT_AT });
+        expect(offer.canWithdrawShare).toBe(false);
+        expect(offer.withdrawShare()).toBe(offer);
+    });
+
+    it('is unavailable on an accepted offer, and on a never-shared draft', () => {
+        const accepted = baseOffer().sendVersion({ sentAt: SENT_AT }).acceptNegotiation();
+        expect(accepted.canWithdrawShare).toBe(false);
+        expect(baseOffer().canWithdrawShare).toBe(false);
+        expect(baseOffer().withdrawShare().negotiation).toBeUndefined();
+    });
+});
+
 describe('resolveRequest — §4.1 derivation table', () => {
     it('quantity: met exactly → done', () => {
         let offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
