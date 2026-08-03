@@ -59,6 +59,7 @@ export type {
     ChangeRequestInput,
     NegotiationState,
     NegotiationSummary,
+    OfferRecipient,
 } from './negotiation/types.js';
 export type {
     ResolvedRequest,

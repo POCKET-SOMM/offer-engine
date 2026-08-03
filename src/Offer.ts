@@ -19,6 +19,7 @@ import type {
     ChangeRequestInput,
     NegotiationLogLine,
     NegotiationState,
+    OfferRecipient,
 } from './negotiation/types.js';
 
 export interface OfferConfig {
@@ -275,6 +276,23 @@ export class Offer {
     /** The negotiation conversation, or undefined for a never-shared draft. */
     get negotiation(): NegotiationState | undefined {
         return this.data?.['negotiation'] as NegotiationState | undefined;
+    }
+
+    /** Who this offer was sent to, once the rep has said. Undefined until then. */
+    get recipient(): OfferRecipient | undefined {
+        return this.data?.['recipient'] as OfferRecipient | undefined;
+    }
+
+    /**
+     * Record (or clear) the recipient. Separate from the transmission itself:
+     * it survives `withdrawShare()` on purpose, so re-sending a pulled-back
+     * offer doesn't ask who it's for all over again.
+     */
+    setRecipient(recipient: OfferRecipient | null): Offer {
+        const data: Record<string, any> = { ...this.data };
+        if (recipient?.email) data['recipient'] = recipient;
+        else delete data['recipient'];
+        return new Offer({ ...this, data });
     }
 
     private _negotiationOrFresh(): NegotiationState {
@@ -650,6 +668,8 @@ export class Offer {
             status: this.status,
             // Titles of all attached menus, in order.
             menuTitles,
+            // So a list row can say who the offer went to without loading items.
+            ...(this.recipient ? { recipient: this.recipient } : {}),
             // Negotiation badge data for list rows ("Your move" / "Their move" /
             // "Approved") — only present once an offer has been shared.
             ...(negotiation ? {

@@ -127,6 +127,15 @@ export interface NegotiationState {
     unpromptedNotes: Record<string, string>;
 }
 
+/** Who the offer was sent to. Captured when the rep shares it, and kept if the
+ *  share is later withdrawn — re-sending should not ask again. This is the only
+ *  place the buyer side has an identity; without it the conversation can only
+ *  say "Restaurant". */
+export interface OfferRecipient {
+    email: string;
+    name?: string | undefined;
+}
+
 /** Projection embedded in toSummary() so list rows can badge "Your move" /
  *  "Their move" / "Approved" without loading items. */
 export interface NegotiationSummary {

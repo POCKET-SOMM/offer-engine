@@ -153,6 +153,14 @@ interface NegotiationState {
      *  needs storage. Cleared at send after being frozen into the log. */
     unpromptedNotes: Record<string, string>;
 }
+/** Who the offer was sent to. Captured when the rep shares it, and kept if the
+ *  share is later withdrawn — re-sending should not ask again. This is the only
+ *  place the buyer side has an identity; without it the conversation can only
+ *  say "Restaurant". */
+interface OfferRecipient {
+    email: string;
+    name?: string | undefined;
+}
 /** Projection embedded in toSummary() so list rows can badge "Your move" /
  *  "Their move" / "Approved" without loading items. */
 interface NegotiationSummary {
@@ -192,6 +200,8 @@ interface OfferSummary {
     menuTitles: string[];
     /** Negotiation badge data — present once the offer has been shared. */
     negotiation?: NegotiationSummary;
+    /** Who the offer was sent to — present once the rep has said. */
+    recipient?: OfferRecipient;
 }
 interface ItemConfig {
     price: number;
@@ -377,6 +387,14 @@ declare class Offer {
     setUnit(unit: string, ids?: string[]): Offer;
     /** The negotiation conversation, or undefined for a never-shared draft. */
     get negotiation(): NegotiationState | undefined;
+    /** Who this offer was sent to, once the rep has said. Undefined until then. */
+    get recipient(): OfferRecipient | undefined;
+    /**
+     * Record (or clear) the recipient. Separate from the transmission itself:
+     * it survives `withdrawShare()` on purpose, so re-sending a pulled-back
+     * offer doesn't ask who it's for all over again.
+     */
+    setRecipient(recipient: OfferRecipient | null): Offer;
     private _negotiationOrFresh;
     private _withNegotiation;
     private _updateRequest;
@@ -638,4 +656,4 @@ declare function deriveUnpromptedChanges(view: NegotiationOfferView, opts?: {
     ignoreRequests?: boolean;
 }): UnpromptedChange[];
 
-export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_OFFER_STATUS, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, type RequestKind, type RequestOutcome, type ResolvedRequest, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, roundBaseline, sortItems, validateCategoryName };
+export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_OFFER_STATUS, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, type RequestKind, type RequestOutcome, type ResolvedRequest, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, roundBaseline, sortItems, validateCategoryName };

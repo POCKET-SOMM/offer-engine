@@ -117,6 +117,10 @@ and `unpromptedNotes` (seller notes keyed by lineId).
   `submitRequests({ requests, senderName, sentAt })` (buyer; stamps `from` off current lines),
   `declineRequest/undeclineRequest(id)`, `setRequestAnswer(id, note)`,
   `markFreeTextAnswered(id)`, `setUnpromptedNote(lineId, note)`, `acceptNegotiation()`.
+- **Recipient**: `recipient` (getter) + `setRecipient({ email, name } | null)` record who the offer
+  was sent to, on the data bag like everything else. Projected into `toSummary().recipient` for list
+  rows, and deliberately SURVIVES `withdrawShare()` — re-sending a pulled-back offer shouldn't ask
+  again. It is also the only identity the buyer side has.
 - **Withdrawing the initial share**: `canWithdrawShare` (getter) + `withdrawShare()` un-send v1 —
   the negotiation is dropped whole and status returns to `'draft'`, as if it had never been sent.
   Items are untouched (edits made since survive). Deliberately limited to a lone, unanswered

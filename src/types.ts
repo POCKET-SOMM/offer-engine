@@ -1,6 +1,6 @@
 import type { OfferStatus } from './constants.js';
 import type { GroupingMode } from './grouping/types.js';
-import type { NegotiationSummary } from './negotiation/types.js';
+import type { NegotiationSummary, OfferRecipient } from './negotiation/types.js';
 
 export interface PourVolume {
     volume: number;      // ml, primary key (unique per item)
@@ -41,6 +41,8 @@ export interface OfferSummary {
     menuTitles: string[];
     /** Negotiation badge data — present once the offer has been shared. */
     negotiation?: NegotiationSummary;
+    /** Who the offer was sent to — present once the rep has said. */
+    recipient?: OfferRecipient;
 }
 
 export interface ItemConfig {

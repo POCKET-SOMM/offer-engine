@@ -150,6 +150,38 @@ describe('flow: sendVersion / submitRequests', () => {
     });
 });
 
+describe('recipient', () => {
+    it('is undefined until set, and round-trips through toJSON', () => {
+        const offer = baseOffer();
+        expect(offer.recipient).toBeUndefined();
+        const addressed = offer.setRecipient({ email: 'marco@trattoria.it', name: 'Marco' });
+        expect(addressed.recipient).toEqual({ email: 'marco@trattoria.it', name: 'Marco' });
+        const reloaded = new Offer({ ...addressed.toJSON(), items: [] });
+        expect(reloaded.recipient).toEqual({ email: 'marco@trattoria.it', name: 'Marco' });
+    });
+
+    it('is projected into the summary for list rows', () => {
+        const offer = baseOffer().setRecipient({ email: 'marco@trattoria.it' });
+        expect(offer.toSummary().recipient).toEqual({ email: 'marco@trattoria.it' });
+        expect(baseOffer().toSummary().recipient).toBeUndefined();
+    });
+
+    it('clears on null, and ignores an entry with no address', () => {
+        const offer = baseOffer().setRecipient({ email: 'marco@trattoria.it' });
+        expect(offer.setRecipient(null).recipient).toBeUndefined();
+        expect(offer.setRecipient({ email: '' }).recipient).toBeUndefined();
+    });
+
+    it('survives withdrawing the share — re-sending should not ask again', () => {
+        const offer = baseOffer()
+            .setRecipient({ email: 'marco@trattoria.it' })
+            .sendVersion({ sentAt: SENT_AT });
+        const withdrawn = offer.withdrawShare();
+        expect(withdrawn.negotiation).toBeUndefined();
+        expect(withdrawn.recipient).toEqual({ email: 'marco@trattoria.it' });
+    });
+});
+
 describe('withdrawShare', () => {
     it('drops the conversation whole and returns the offer to draft', () => {
         const sent = baseOffer().sendVersion({ sentAt: SENT_AT, senderName: 'You' });
