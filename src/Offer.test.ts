@@ -599,22 +599,22 @@ describe('Menus', () => {
         expect(offer.setMenu(null).menus).toEqual([]);
     });
 
-    it('round-trips menus through toJSON / new Offer and mirrors legacy `menu`', () => {
+    it('round-trips menus through toJSON / new Offer without the legacy `menu` key', () => {
         const json = new Offer()
             .addMenu({ id: 'm1', title: 'One' })
             .addMenu({ id: 'm2', title: 'Two' })
             .toJSON();
         expect(json.menus.map((m: any) => m.id)).toEqual(['m1', 'm2']);
-        expect(json.menu).toEqual({ id: 'm1', title: 'One' });
+        expect('menu' in json).toBe(false);
         expect(new Offer(json).menus.map((m) => m.id)).toEqual(['m1', 'm2']);
     });
 
-    it('summary lists every attached menu title in order', () => {
+    it('summary lists every attached menu title in order, null for untitled', () => {
         const offer = new Offer()
             .addMenu({ id: 'm1', title: 'Dinner' })
             .addMenu({ id: 'm2', title: 'Wine Card' })
-            .addMenu({ id: 'm3' }); // untitled → skipped
-        expect(offer.toSummary().menuTitles).toEqual(['Dinner', 'Wine Card']);
+            .addMenu({ id: 'm3' }); // untitled → null, not dropped
+        expect(offer.toSummary().menuTitles).toEqual(['Dinner', 'Wine Card', null]);
     });
 
     it('menus survive unrelated mutations (title, status, grouping)', () => {

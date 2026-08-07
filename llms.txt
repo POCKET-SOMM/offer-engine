@@ -42,8 +42,9 @@ logic lives in the consumer app). Mutate immutably with `setMenus(menus)`, `addM
 - `offer.menu` is a **getter** returning `menus[0] ?? null` (prototype getter, so `{ ...offer }` spreads
   `menus`, never a stale `menu`).
 - `setMenu(menu)` is a shim → `setMenus(menu ? [menu] : [])`.
-- The constructor accepts a legacy single `menu` and wraps it into `menus`; `menus` wins if both given.
-- `toJSON()` writes `menus` **and** mirrors the first under `menu` for readers still on the old shape.
+- The constructor accepts a legacy single `menu` and wraps it into `menus`; `menus` wins if both given
+  (kept so old stored blobs from before the multi-menu migration still load).
+- `toJSON()` writes only `menus` — it no longer mirrors the first menu under the legacy `menu` key.
 
 ### Convention: the `data` bag (`offer.data` / `item.data`)
 Both `Offer` and `OfferItem` carry a free-form `data: Record<string, any>` that the constructor
@@ -64,7 +65,7 @@ fields the engine doesn't model — so a feature can be added **without** wideni
   expose a `value` key the consumer localizes itself. Empty groups are omitted.
 - `groupingMode` — the mode `groups` was built with.
 - `wineCount`, `status`.
-- `menuTitles` — titles of all attached menus in order (untitled menus omitted); `[]` when none.
+- `menuTitles` — titles of all attached menus in order (`null` for an untitled menu); `[]` when none.
 
 Item order (flat and within groups) follows the offer's saved `sort`, or insertion order when unset.
 

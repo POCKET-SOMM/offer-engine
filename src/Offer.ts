@@ -654,9 +654,8 @@ export class Offer {
                 };
             });
 
-        const menuTitles = this.menus
-            .map((menu) => menu?.title)
-            .filter((title): title is string => typeof title === 'string' && title.length > 0);
+        const menuTitles = this.menus.map((menu): string | null =>
+            typeof menu?.title === 'string' && menu.title.length > 0 ? menu.title : null);
 
         const negotiation = this.negotiation;
 
@@ -666,7 +665,7 @@ export class Offer {
             groupingMode: mode,
             wineCount: this.items.length,
             status: this.status,
-            // Titles of all attached menus, in order.
+            // Titles of all attached menus, in order; null for an untitled menu.
             menuTitles,
             // So a list row can say who the offer went to without loading items.
             ...(this.recipient ? { recipient: this.recipient } : {}),
@@ -693,9 +692,6 @@ export class Offer {
             id: this.id,
             title: this.title,
             menus: this.menus,
-            // Mirror the first menu under the legacy key so blob readers still on
-            // the single-menu shape keep working. Remove once all are migrated.
-            menu: this.menu,
             items: this.items.map(item => item.toJSON()),
             totals: this.totals,
             data: this.data,

@@ -196,8 +196,9 @@ interface OfferSummary {
     groupingMode: GroupingMode;
     wineCount: number;
     status: OfferStatus;
-    /** Titles of all attached menus, in order. Empty when no menu is attached. */
-    menuTitles: string[];
+    /** Titles of all attached menus, in order; null for an untitled menu. Empty
+     *  when no menu is attached. */
+    menuTitles: (string | null)[];
     /** Negotiation badge data — present once the offer has been shared. */
     negotiation?: NegotiationSummary;
     /** Who the offer was sent to — present once the rep has said. */
@@ -509,7 +510,6 @@ declare class Offer {
         id: string;
         title: string;
         menus: readonly any[];
-        menu: any;
         items: {
             pricePerUnit: number;
             vatAmount: number;
