@@ -148,10 +148,6 @@ interface NegotiationState {
     /** The live round's requests only. Frozen into the answering version's log
      *  at send and cleared. */
     requests: ChangeRequest[];
-    /** Seller notes on unprompted changes, keyed by lineId. The changes
-     *  themselves are derived (diff vs the latest baseline) — only the note
-     *  needs storage. Cleared at send after being frozen into the log. */
-    unpromptedNotes: Record<string, string>;
 }
 /** Who the offer was sent to. Captured when the rep shares it, and kept if the
  *  share is later withdrawn — re-sending should not ask again. This is the only
@@ -388,6 +384,15 @@ declare class Offer {
     setUnit(unit: string, ids?: string[]): Offer;
     /** The negotiation conversation, or undefined for a never-shared draft. */
     get negotiation(): NegotiationState | undefined;
+    /**
+     * Freeform notes on wine lines, keyed by lineId. Independent of
+     * `negotiation` — a note isn't itself a negotiated change (those are
+     * derived, see negotiation/derive.ts), it's an annotation the sender
+     * attaches to a line, on or off a live conversation. Cleared by
+     * `submitRequests()` once the round it explained has been answered and
+     * is preserved in that round's frozen log — see `setLineNote`.
+     */
+    get notes(): Record<string, string>;
     /** Who this offer was sent to, once the rep has said. Undefined until then. */
     get recipient(): OfferRecipient | undefined;
     /**
@@ -432,9 +437,12 @@ declare class Offer {
     setRequestAnswer(id: string, note: string | null): Offer;
     /** Settle a free-text ask ('note', or 'add' nothing was added for). */
     markFreeTextAnswered(id: string, answered?: boolean): Offer;
-    /** Seller note on an unprompted change, keyed by the line it touches. The
-     *  change itself is derived; only the note needs storage. */
-    setUnpromptedNote(lineId: string, note: string): Offer;
+    /**
+     * Record (or clear) a note on a line. Works whether or not a negotiation
+     * has ever started — a note doesn't require anyone to be mid-round, it's
+     * just an annotation. See `notes` for the lifecycle.
+     */
+    setLineNote(lineId: string, note: string): Offer;
     /**
      * Whether the initial share can still be pulled back: the seller has sent
      * once, nothing has come back, and the offer isn't accepted. Deliberately

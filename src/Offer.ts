@@ -278,6 +278,18 @@ export class Offer {
         return this.data?.['negotiation'] as NegotiationState | undefined;
     }
 
+    /**
+     * Freeform notes on wine lines, keyed by lineId. Independent of
+     * `negotiation` — a note isn't itself a negotiated change (those are
+     * derived, see negotiation/derive.ts), it's an annotation the sender
+     * attaches to a line, on or off a live conversation. Cleared by
+     * `submitRequests()` once the round it explained has been answered and
+     * is preserved in that round's frozen log — see `setLineNote`.
+     */
+    get notes(): Record<string, string> {
+        return (this.data?.['notes'] as Record<string, string> | undefined) ?? {};
+    }
+
     /** Who this offer was sent to, once the rep has said. Undefined until then. */
     get recipient(): OfferRecipient | undefined {
         return this.data?.['recipient'] as OfferRecipient | undefined;
@@ -301,7 +313,6 @@ export class Offer {
             turn: 'buyer',
             versions: [],
             requests: [],
-            unpromptedNotes: {},
         };
     }
 
@@ -392,13 +403,13 @@ export class Offer {
                 answeredFreeText: false,
             };
         });
-        return this._withNegotiation({
-            ...neg,
-            versions: [...neg.versions, version],
-            requests: stamped,
-            unpromptedNotes: {},
-            turn: 'seller',
-        });
+        // Notes explained the round just answered — it's now frozen into that
+        // round's log (composed by the consumer from `this.notes` before
+        // calling this), so the next round starts with a clean slate.
+        return this._withNegotiation(
+            { ...neg, versions: [...neg.versions, version], requests: stamped, turn: 'seller' },
+            { notes: {} },
+        );
     }
 
     /** Explicitly decline a request — the one outcome the items can't express. */
@@ -420,15 +431,16 @@ export class Offer {
         return this._updateRequest(id, { answeredFreeText: answered });
     }
 
-    /** Seller note on an unprompted change, keyed by the line it touches. The
-     *  change itself is derived; only the note needs storage. */
-    setUnpromptedNote(lineId: string, note: string): Offer {
-        const neg = this.negotiation;
-        if (!neg) return this;
-        const unpromptedNotes = { ...neg.unpromptedNotes };
-        if (note) unpromptedNotes[lineId] = note;
-        else delete unpromptedNotes[lineId];
-        return this._withNegotiation({ ...neg, unpromptedNotes });
+    /**
+     * Record (or clear) a note on a line. Works whether or not a negotiation
+     * has ever started — a note doesn't require anyone to be mid-round, it's
+     * just an annotation. See `notes` for the lifecycle.
+     */
+    setLineNote(lineId: string, note: string): Offer {
+        const notes = { ...this.notes };
+        if (note) notes[lineId] = note;
+        else delete notes[lineId];
+        return new Offer({ ...this, data: { ...this.data, notes } });
     }
 
     /**

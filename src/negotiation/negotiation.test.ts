@@ -100,7 +100,7 @@ describe('flow: sendVersion / submitRequests', () => {
 
     it('the seller answer round keeps the requests as the buyer’s receipt', () => {
         let offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
-        offer = offer.setQuantity(18, ['a']).setUnpromptedNote('b', 'price holds');
+        offer = offer.setQuantity(18, ['a']).setLineNote('b', 'price holds');
         offer = offer.sendVersion({ sentAt: SENT_AT, log: [{ text: 'Set to 18 instead' }] });
         const neg = offer.negotiation!;
         expect(neg.versions).toHaveLength(3);
@@ -110,7 +110,7 @@ describe('flow: sendVersion / submitRequests', () => {
         // receipt), and outcomes still derive correctly because they anchor to
         // the round-opening baseline, not the just-sent one.
         expect(neg.requests).toHaveLength(1);
-        expect(neg.unpromptedNotes).toEqual({ b: 'price holds' });
+        expect(offer.notes).toEqual({ b: 'price holds' });
         expect(resolveRequest(neg.requests[0]!, offer)).toMatchObject({
             outcome: 'changed', label: 'setToInstead', params: { qty: 18 },
         });
@@ -127,13 +127,13 @@ describe('flow: sendVersion / submitRequests', () => {
 
     it('the buyer’s next round replaces the previous requests and notes', () => {
         let offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
-        offer = offer.setQuantity(20, ['a']).setUnpromptedNote('b', 'price holds');
+        offer = offer.setQuantity(20, ['a']).setLineNote('b', 'price holds');
         offer = offer.sendVersion({ sentAt: SENT_AT });
         offer = offer.submitRequests({ sentAt: SENT_AT, requests: [{ kind: 'remove', lineId: 'b' }] });
         const neg = offer.negotiation!;
         expect(neg.requests).toHaveLength(1);
         expect(neg.requests[0]!.kind).toBe('remove');
-        expect(neg.unpromptedNotes).toEqual({});
+        expect(offer.notes).toEqual({});
     });
 
     it('acceptNegotiation ends the conversation and sets offer status', () => {
@@ -147,6 +147,31 @@ describe('flow: sendVersion / submitRequests', () => {
         const reloaded = new Offer({ ...offer.toJSON(), items: [] });
         expect(reloaded.negotiation!.versions).toHaveLength(2);
         expect(reloaded.negotiation!.requests).toHaveLength(1);
+    });
+});
+
+describe('notes', () => {
+    it('can be set on a never-shared offer, with no negotiation at all', () => {
+        const offer = baseOffer().setLineNote('a', 'recommend with the duck');
+        expect(offer.negotiation).toBeUndefined();
+        expect(offer.notes).toEqual({ a: 'recommend with the duck' });
+    });
+
+    it('clearing with an empty string removes the key', () => {
+        const offer = baseOffer().setLineNote('a', 'x').setLineNote('a', '');
+        expect(offer.notes).toEqual({});
+    });
+
+    it('survives sendVersion (the seller answers with a note attached)', () => {
+        const offer = baseOffer().setLineNote('a', 'price holds').sendVersion({ sentAt: SENT_AT });
+        expect(offer.notes).toEqual({ a: 'price holds' });
+    });
+
+    it('survives withdrawShare, unlike the old negotiation-nested storage', () => {
+        const offer = baseOffer().setLineNote('a', 'price holds').sendVersion({ sentAt: SENT_AT });
+        const withdrawn = offer.withdrawShare();
+        expect(withdrawn.negotiation).toBeUndefined();
+        expect(withdrawn.notes).toEqual({ a: 'price holds' });
     });
 });
 

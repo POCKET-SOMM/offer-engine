@@ -90,8 +90,8 @@ of negotiation. An explicit `lineId` in a swap config wins (that's how swap-undo
 ### Negotiation (`src/negotiation/`, stored at `offer.data.negotiation`)
 Two-way change negotiation on a live offer. `NegotiationState`: `state` (`'open'|'accepted'`),
 `turn` (`'seller'|'buyer'`), append-only `versions` (one per transmission: sender, sentAt, frozen
-display `log`, and a compact `baseline` of the lines as transmitted), the live round's `requests`,
-and `unpromptedNotes` (seller notes keyed by lineId).
+display `log`, and a compact `baseline` of the lines as transmitted), and the live round's
+`requests`. Line notes are NOT part of this — see `notes` below.
 - **Outcomes are derived, never stored.** `resolveRequest(request, offer)` returns
   `{ outcome: 'open'|'done'|'changed'|'declined', label, params }` — label is an i18n token
   (`doneAsAsked`, `setToInstead`, `cutToInstead`, `swappedFor`, `droppedNoReplacement`,
@@ -115,9 +115,18 @@ and `unpromptedNotes` (seller notes keyed by lineId).
   explains. Reverting the edit removes the entry.
 - **Flow methods on `Offer`** (immutable, timestamps caller-supplied — the engine never reads the
   clock): `sendVersion({ senderName, sentAt, log })` (seller; also sets status `'sent'`),
-  `submitRequests({ requests, senderName, sentAt })` (buyer; stamps `from` off current lines),
-  `declineRequest/undeclineRequest(id)`, `setRequestAnswer(id, note)`,
-  `markFreeTextAnswered(id)`, `setUnpromptedNote(lineId, note)`, `acceptNegotiation()`.
+  `submitRequests({ requests, senderName, sentAt })` (buyer; stamps `from` off current lines, and
+  clears `notes` — see below), `declineRequest/undeclineRequest(id)`, `setRequestAnswer(id, note)`,
+  `markFreeTextAnswered(id)`, `acceptNegotiation()`.
+- **Notes** (`notes` getter + `setLineNote(lineId, note)`, stored at `offer.data.notes`,
+  `Record<string, string>`): a freeform annotation on a line, independent of `negotiation` — works
+  on a never-shared draft same as on a live offer, since it isn't itself a negotiated change (those
+  are derived, see above). `setLineNote(lineId, '')` clears it. Survives `sendVersion` and
+  `withdrawShare` (like `recipient`), but is cleared by `submitRequests` — a note explains the round
+  it was part of, and once the other party has moved the conversation into a new round, that
+  explanation is already permanently preserved in the previous round's frozen `log`, so the slate
+  clears for the next one. Consumers compose the log line from `notes` themselves, same as they do
+  for unprompted changes and request answers.
 - **Recipient**: `recipient` (getter) + `setRecipient({ email, name } | null)` record who the offer
   was sent to, on the data bag like everything else. Projected into `toSummary().recipient` for list
   rows, and deliberately SURVIVES `withdrawShare()` — re-sending a pulled-back offer shouldn't ask

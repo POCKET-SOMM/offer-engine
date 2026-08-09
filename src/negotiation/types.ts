@@ -121,10 +121,6 @@ export interface NegotiationState {
     /** The live round's requests only. Frozen into the answering version's log
      *  at send and cleared. */
     requests: ChangeRequest[];
-    /** Seller notes on unprompted changes, keyed by lineId. The changes
-     *  themselves are derived (diff vs the latest baseline) — only the note
-     *  needs storage. Cleared at send after being frozen into the log. */
-    unpromptedNotes: Record<string, string>;
 }
 
 /** Who the offer was sent to. Captured when the rep shares it, and kept if the
