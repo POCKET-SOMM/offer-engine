@@ -47,5 +47,5 @@ export const OTHER_SECTION_VALUE = '__other__';
 export const STRATEGY_MISSING_VALUE = '__strategy_missing__';
 
 /** Rendering order for built-in 'type' mode. */
-export const WINE_TYPE_KEYS = ['sparkling', 'white', 'rose', 'red', 'fortified', 'dessert'] as const;
+export const WINE_TYPE_KEYS = ['sparkling', 'white', 'rose', 'orange', 'red', 'fortified', 'dessert'] as const;
 export type WineTypeKey = typeof WINE_TYPE_KEYS[number];

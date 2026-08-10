@@ -18,9 +18,14 @@ describe('detectWineType', () => {
         expect(detectWineType(itemWithType('red'))).toBe('red');
         expect(detectWineType(itemWithType('white'))).toBe('white');
         expect(detectWineType(itemWithType('rose'))).toBe('rose');
+        expect(detectWineType(itemWithType('orange'))).toBe('orange');
         expect(detectWineType(itemWithType('sparkling'))).toBe('sparkling');
         expect(detectWineType(itemWithType('dessert'))).toBe('dessert');
         expect(detectWineType(itemWithType('fortified'))).toBe('fortified');
+    });
+
+    it('detects orange wine from a descriptive type string', () => {
+        expect(detectWineType(itemWithType('orange wine'))).toBe('orange');
     });
 
     it('applies precedence: later in the precedence list wins', () => {
@@ -30,6 +35,8 @@ describe('detectWineType', () => {
         expect(detectWineType(itemWithType('red, fortified'))).toBe('fortified');
         // 'white, dessert' → dessert beats white
         expect(detectWineType(itemWithType('white, dessert'))).toBe('dessert');
+        // 'rose, orange' → orange beats rose
+        expect(detectWineType(itemWithType('rose, orange'))).toBe('orange');
     });
 
     it('is case-insensitive', () => {
@@ -38,7 +45,7 @@ describe('detectWineType', () => {
     });
 
     it('returns null when no key is recognized', () => {
-        expect(detectWineType(itemWithType('orange wine'))).toBeNull();
+        expect(detectWineType(itemWithType('skin-contact blend'))).toBeNull();
     });
 
     it('accepts type as a string array (catalog wine shape)', () => {

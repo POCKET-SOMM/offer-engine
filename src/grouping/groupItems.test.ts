@@ -16,8 +16,18 @@ describe('groupItems — type mode', () => {
         ];
         const sections = groupItems(items, { mode: 'type' });
         const values = sections.map((s) => s.value);
-        // Display order is ['sparkling', 'white', 'rose', 'red', 'fortified', 'dessert']
+        // Display order is ['sparkling', 'white', 'rose', 'orange', 'red', 'fortified', 'dessert']
         expect(values).toEqual(['sparkling', 'white', 'red', OTHER_SECTION_VALUE]);
+    });
+
+    it('gives orange wine its own section instead of falling into Other', () => {
+        const items = [
+            item('a', { type: 'red' }),
+            item('b', { type: 'orange' }),
+        ];
+        const sections = groupItems(items, { mode: 'type' });
+        const values = sections.map((s) => s.value);
+        expect(values).toEqual(['orange', 'red']);
     });
 
     it('omits empty sections', () => {

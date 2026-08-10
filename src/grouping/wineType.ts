@@ -6,7 +6,7 @@ import { WINE_TYPE_KEYS, type WineTypeKey } from './types.js';
  * "white, sparkling"), the LAST key in this array wins. Mirrors the legacy
  * sommify-menu behavior so "white, sparkling" → "sparkling".
  */
-const PRECEDENCE: readonly WineTypeKey[] = ['red', 'white', 'rose', 'sparkling', 'dessert', 'fortified'];
+const PRECEDENCE: readonly WineTypeKey[] = ['red', 'white', 'rose', 'orange', 'sparkling', 'dessert', 'fortified'];
 
 /**
  * Detect the canonical wine-type bucket for an item.

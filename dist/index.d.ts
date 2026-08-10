@@ -43,7 +43,7 @@ interface GroupedSection {
 declare const OTHER_SECTION_VALUE = "__other__";
 declare const STRATEGY_MISSING_VALUE = "__strategy_missing__";
 /** Rendering order for built-in 'type' mode. */
-declare const WINE_TYPE_KEYS: readonly ["sparkling", "white", "rose", "red", "fortified", "dessert"];
+declare const WINE_TYPE_KEYS: readonly ["sparkling", "white", "rose", "orange", "red", "fortified", "dessert"];
 type WineTypeKey = typeof WINE_TYPE_KEYS[number];
 
 declare const NEGOTIATION_PARTIES: readonly ["seller", "buyer"];
