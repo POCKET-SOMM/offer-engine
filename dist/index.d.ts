@@ -444,18 +444,20 @@ declare class Offer {
      */
     setLineNote(lineId: string, note: string): Offer;
     /**
-     * Whether the initial share can still be pulled back: the seller has sent
-     * once, nothing has come back, and the offer isn't accepted. Deliberately
-     * narrow — a later transmission can't be withdrawn, because the round it
-     * answered (or, for a buyer round, the requests it replaced) is not
-     * recoverable from what the version record keeps.
+     * Whether the conversation can be pulled back to a draft: any time it's
+     * live and not yet accepted, regardless of how many rounds have gone
+     * back and forth. Withdrawing here is a full undo, not a partial one —
+     * it drops every version and every request whole, so a later round's
+     * history (their replies, their asks) is gone too, not just the
+     * seller's first send.
      */
     get canWithdrawShare(): boolean;
     /**
-     * Undo the initial share: the conversation is dropped whole and the offer
-     * goes back to being a draft, as if it had never been sent. The wine list
-     * is untouched — withdrawing pulls back the transmission, not the edits
-     * made since. A no-op unless `canWithdrawShare`.
+     * Undo the share: the conversation is dropped whole — every version,
+     * every request — and the offer goes back to being a draft, as if it had
+     * never been sent. The wine list is untouched — withdrawing pulls back
+     * the transmission, not the edits made since. A no-op unless
+     * `canWithdrawShare`.
      */
     withdrawShare(): Offer;
     /** Buyer accepts the offer as it stands. Ends the conversation. */

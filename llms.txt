@@ -131,11 +131,12 @@ display `log`, and a compact `baseline` of the lines as transmitted), and the li
   was sent to, on the data bag like everything else. Projected into `toSummary().recipient` for list
   rows, and deliberately SURVIVES `withdrawShare()` — re-sending a pulled-back offer shouldn't ask
   again. It is also the only identity the buyer side has.
-- **Withdrawing the initial share**: `canWithdrawShare` (getter) + `withdrawShare()` un-send v1 —
-  the negotiation is dropped whole and status returns to `'draft'`, as if it had never been sent.
-  Items are untouched (edits made since survive). Deliberately limited to a lone, unanswered
-  seller version: nothing later can be withdrawn, because the round it answered — or, for a buyer
-  round, the requests it replaced — is not recoverable from the version record. No-op otherwise.
+- **Withdrawing the share**: `canWithdrawShare` (getter) + `withdrawShare()` un-send the whole
+  conversation — negotiation is dropped whole and status returns to `'draft'`, as if it had never
+  been sent. Items are untouched (edits made since survive). Available any time `negotiation.state
+  === 'open'`, regardless of version count or open requests — this is a FULL undo, not a partial
+  one: withdrawing after several rounds drops the other party's replies and requests too, not just
+  the seller's first send. No-op once accepted, or on a never-shared draft.
 - Helpers: `resolveRequests`, `countOpenRequests`, `itemByLineId`, `latestBaseline`.
 - `toSummary()` embeds `negotiation: { state, turn, openCount, versionCount }` once shared — list
   rows badge "Your move" / "Their move" / "Approved" without loading items.

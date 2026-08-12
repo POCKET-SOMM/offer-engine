@@ -230,17 +230,20 @@ describe('withdrawShare', () => {
         expect(reloaded.status).toBe('draft');
     });
 
-    it('is unavailable once the buyer has responded', () => {
+    it('is available even after the buyer has responded — a full undo, not a partial one', () => {
         const offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
-        expect(offer.canWithdrawShare).toBe(false);
-        expect(offer.withdrawShare()).toBe(offer);
+        expect(offer.canWithdrawShare).toBe(true);
+        const withdrawn = offer.withdrawShare();
+        expect(withdrawn.negotiation).toBeUndefined();
+        expect(withdrawn.status).toBe('draft');
     });
 
-    it('is unavailable for a later seller version', () => {
+    it('is available for a later seller version too', () => {
         let offer = negotiatingOffer([{ kind: 'quantity', lineId: 'a', to: 20 }]);
         offer = offer.setQuantity(20, ['a']).sendVersion({ sentAt: SENT_AT });
-        expect(offer.canWithdrawShare).toBe(false);
-        expect(offer.withdrawShare()).toBe(offer);
+        expect(offer.canWithdrawShare).toBe(true);
+        const withdrawn = offer.withdrawShare();
+        expect(withdrawn.negotiation).toBeUndefined();
     });
 
     it('is unavailable on an accepted offer, and on a never-shared draft', () => {
