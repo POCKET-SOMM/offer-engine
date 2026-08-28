@@ -1,4 +1,5 @@
 import { round } from './utils/math.js';
+import { applyRounding, type RoundInput } from './utils/rounding.js';
 import { UNIT_MULTIPLIERS } from './constants.js';
 import type { ItemConfig, PourVolume } from './types.js';
 
@@ -148,23 +149,32 @@ export class OfferItem {
         return new OfferItem({ ...config, ...fields });
     }
 
-    roundCustomerPrice(step: number = 1): OfferItem {
-        const roundedValue = Math.round(this.customerPrice / step) * step;
-        return this.update({ customerPrice: round(roundedValue) });
+    /**
+     * Round the customer price. Accepts a bare step (legacy), a preset name
+     * ('whole', 'half_up', 'charm_49', ...) or a RoundingRule. Rounding never
+     * pushes the price below cost incl. VAT (gross >= 0), stepping up instead.
+     */
+    roundCustomerPrice(rule: RoundInput = 1): OfferItem {
+        const floor = this.pricePerBottle * (1 + this.vatRate / 100);
+        const roundedValue = applyRounding(this.customerPrice, rule, { min: round(floor) });
+        if (roundedValue === this.customerPrice) return this;
+        return this.update({ customerPrice: roundedValue });
     }
 
-    roundGlassPrice(step: number = 1): OfferItem {
+    roundGlassPrice(rule: RoundInput = 1): OfferItem {
         if (this.glassPrice === undefined) return this;
-        const roundedValue = Math.round(this.glassPrice / step) * step;
-        return this.update({ glassPrice: round(roundedValue) });
+        const roundedValue = applyRounding(this.glassPrice, rule, { min: 0 });
+        if (roundedValue === this.glassPrice) return this;
+        return this.update({ glassPrice: roundedValue });
     }
 
-    roundPourVolumePrices(step: number = 1): OfferItem {
+    roundPourVolumePrices(rule: RoundInput = 1): OfferItem {
         if (this.pourVolumes.length === 0) return this;
         const rounded = this.pourVolumes.map(pv => ({
             ...pv,
-            price: round(Math.round(pv.price / step) * step),
+            price: applyRounding(pv.price, rule, { min: 0 }),
         }));
+        if (rounded.every((pv, i) => pv.price === this.pourVolumes[i]?.price)) return this;
         return this.update({ pourVolumes: rounded });
     }
 

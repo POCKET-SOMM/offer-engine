@@ -9,6 +9,7 @@ import {
 import { OfferItem } from './OfferItem.js';
 import type { ItemConfig, OfferTotals, PourVolume, OfferSummary, OfferSummaryGroup, OfferThumbnail } from './types.js';
 import { round } from './utils/math.js';
+import type { RoundInput } from './utils/rounding.js';
 import { normalizeCustomGrouping, validateCategoryName } from './grouping/normalize.js';
 import { groupItems } from './grouping/groupItems.js';
 import type { CustomCategory, GroupingConfig, GroupingMode } from './grouping/types.js';
@@ -189,66 +190,88 @@ export class Offer {
     /**
      * Bulk update field across multiple items
      */
-    bulkUpdateField(ids: string[] | undefined, field: keyof ItemConfig, value: any): Offer {
+    /**
+     * Bulk update field across multiple items.
+     * `opts.round` (step | preset | rule) rounds each affected item's
+     * customer price right after the update — pass it on price-deriving
+     * fields (margin, gross, discount, vatRate, customerPrice). On
+     * glassPrice it rounds the glass price instead.
+     */
+    bulkUpdateField(
+        ids: string[] | undefined,
+        field: keyof ItemConfig,
+        value: any,
+        opts: { round?: RoundInput } = {},
+    ): Offer {
         const newItems = this.items.map(item => {
             if (ids && !ids.includes(item.id)) return item;
-            return item.update({ [field]: value });
+            let updated = item.update({ [field]: value });
+            if (opts.round !== undefined && opts.round !== null) {
+                updated = field === 'glassPrice'
+                    ? updated.roundGlassPrice(opts.round)
+                    : updated.roundCustomerPrice(opts.round);
+            }
+            return updated;
         });
         return new Offer({ ...this, items: newItems });
     }
 
-    setMargin(value: number, ids?: string[]): Offer {
-        return this.bulkUpdateField(ids, 'margin', value);
+    setMargin(value: number, ids?: string[], opts: { round?: RoundInput } = {}): Offer {
+        return this.bulkUpdateField(ids, 'margin', value, opts);
     }
 
-    setGross(value: number, ids?: string[]): Offer {
-        return this.bulkUpdateField(ids, 'gross', value);
+    setGross(value: number, ids?: string[], opts: { round?: RoundInput } = {}): Offer {
+        return this.bulkUpdateField(ids, 'gross', value, opts);
     }
 
-    setDiscount(value: number, ids?: string[]): Offer {
-        return this.bulkUpdateField(ids, 'discount', value);
+    setDiscount(value: number, ids?: string[], opts: { round?: RoundInput } = {}): Offer {
+        return this.bulkUpdateField(ids, 'discount', value, opts);
     }
 
     setQuantity(value: number, ids?: string[]): Offer {
         return this.bulkUpdateField(ids, 'quantity', value);
     }
 
-    setVatRate(value: number, ids?: string[]): Offer {
-        return this.bulkUpdateField(ids, 'vatRate', value);
+    setVatRate(value: number, ids?: string[], opts: { round?: RoundInput } = {}): Offer {
+        return this.bulkUpdateField(ids, 'vatRate', value, opts);
     }
 
-    setPourVolume(pv: PourVolume, ids?: string[]): Offer {
+    setPourVolume(pv: PourVolume, ids?: string[], opts: { round?: RoundInput } = {}): Offer {
         const newItems = this.items.map(item => {
             if (ids && !ids.includes(item.id)) return item;
-            return item.setPourVolume(pv);
+            let updated = item.setPourVolume(pv);
+            if (opts.round !== undefined && opts.round !== null) {
+                updated = updated.roundPourVolumePrices(opts.round);
+            }
+            return updated;
         });
         return new Offer({ ...this, items: newItems });
     }
 
-    setGlassPrice(value: number, ids?: string[]): Offer {
-        return this.bulkUpdateField(ids, 'glassPrice', value);
+    setGlassPrice(value: number, ids?: string[], opts: { round?: RoundInput } = {}): Offer {
+        return this.bulkUpdateField(ids, 'glassPrice', value, opts);
     }
 
-    roundCustomerPrices(step: number = 1, ids?: string[]): Offer {
+    roundCustomerPrices(rule: RoundInput = 1, ids?: string[]): Offer {
         const newItems = this.items.map(item => {
             if (ids && !ids.includes(item.id)) return item;
-            return item.roundCustomerPrice(step);
+            return item.roundCustomerPrice(rule);
         });
         return new Offer({ ...this, items: newItems });
     }
 
-    roundGlassPrices(step: number = 1, ids?: string[]): Offer {
+    roundGlassPrices(rule: RoundInput = 1, ids?: string[]): Offer {
         const newItems = this.items.map(item => {
             if (ids && !ids.includes(item.id)) return item;
-            return item.roundGlassPrice(step);
+            return item.roundGlassPrice(rule);
         });
         return new Offer({ ...this, items: newItems });
     }
 
-    roundPourVolumePrices(step: number = 1, ids?: string[]): Offer {
+    roundPourVolumePrices(rule: RoundInput = 1, ids?: string[]): Offer {
         const newItems = this.items.map(item => {
             if (ids && !ids.includes(item.id)) return item;
-            return item.roundPourVolumePrices(step);
+            return item.roundPourVolumePrices(rule);
         });
         return new Offer({ ...this, items: newItems });
     }

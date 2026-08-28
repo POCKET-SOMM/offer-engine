@@ -117,6 +117,49 @@ describe('Bulk Operations', () => {
         expect(updated.items[0]?.customerPrice).toBe(200); // 100 / (1 - 0.5)
     });
 
+    it('rounds affected prices when setMargin gets a round option', () => {
+        const o = new Offer({
+            items: [
+                new OfferItem({ price: 5.91, id: 'a', vatRate: 25.5 }),
+                new OfferItem({ price: 7.13, id: 'b', vatRate: 25.5 }),
+            ],
+        });
+        const updated = o.setMargin(70, undefined, { round: 'charm_49' });
+        for (const item of updated.items) {
+            expect(Math.round((item.customerPrice % 1) * 100)).toBe(49);
+            const sum = item.pricePerBottle + item.gross + item.vatAmount;
+            expect(Math.abs(sum - item.customerPrice)).toBeLessThan(0.011);
+        }
+    });
+
+    it('rounds only targeted ids and leaves others untouched', () => {
+        const o = new Offer({
+            items: [
+                new OfferItem({ price: 5.91, id: 'a', vatRate: 25.5 }),
+                new OfferItem({ price: 7.13, id: 'b', vatRate: 25.5 }),
+            ],
+        });
+        const updated = o.setMargin(70, ['a'], { round: 'whole' });
+        expect(updated.items[0]?.customerPrice).toBe(25);
+        expect(updated.items[1]?.customerPrice).toBe(o.items[1]?.customerPrice);
+    });
+
+    it('setPourVolume with round option rounds the new pour price', () => {
+        const o = new Offer({
+            items: [new OfferItem({ price: 10, id: 'a' })],
+        });
+        const updated = o.setPourVolume({ volume: 150, price: 9.81 }, undefined, { round: 'half_up' });
+        expect(updated.items[0]?.pourVolumes[0]?.price).toBe(10);
+    });
+
+    it('roundCustomerPrices accepts a preset name', () => {
+        const o = new Offer({
+            items: [new OfferItem({ price: 5.91, id: 'a', vatRate: 25.5, margin: 70 })],
+        });
+        const updated = o.roundCustomerPrices('charm_99');
+        expect(updated.items[0]?.customerPrice).toBe(24.99);
+    });
+
     it('should set gross for specific items', () => {
         const updated = offer.setGross(100, ['1']);
         expect(updated.items[0]?.gross).toBe(100);

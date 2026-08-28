@@ -4,6 +4,39 @@ declare const DEFAULT_OFFER_STATUS: OfferStatus;
 declare const SUMMARY_THUMBNAIL_LIMIT = 8;
 declare const SUMMARY_GROUP_THUMBNAIL_LIMIT = 3;
 
+/**
+ * A rounding rule as three numbers: snap `(value - ending)` to a multiple of
+ * `step`, then add `ending` back. `direction` picks which grid candidate wins
+ * (default 'nearest').
+ */
+interface RoundingRule {
+    step: number;
+    ending?: number;
+    direction?: 'nearest' | 'up' | 'down';
+}
+type RoundingPreset = 'none' | 'whole' | 'whole_up' | 'half' | 'half_up' | 'charm_99' | 'charm_95' | 'charm_49' | 'five';
+/** Anything the round methods accept: a bare step (legacy), a preset name, or a rule. */
+type RoundInput = number | RoundingPreset | RoundingRule | null | undefined;
+declare const ROUNDING_PRESETS: Record<RoundingPreset, RoundingRule | null>;
+/**
+ * Normalize a RoundInput to a rule (or null = no rounding).
+ * A bare number keeps the legacy `roundCustomerPrice(step)` semantics.
+ * Unknown preset strings and non-positive steps resolve to null rather than
+ * throwing — rounding is a finishing touch, never worth failing an update for.
+ */
+declare function resolveRounding(input: RoundInput): RoundingRule | null;
+/**
+ * Snap `value` per `input`. Returns `value` unchanged (2-dp normalized) when
+ * the input resolves to no rule.
+ *
+ * `opts.min` is a hard floor: when the snapped candidate lands below it, the
+ * result is re-snapped UPWARD to the first grid candidate at or above the
+ * floor — never a bare max, which would emit an off-grid price.
+ */
+declare function applyRounding(value: number, input?: RoundInput, opts?: {
+    min?: number;
+}): number;
+
 type GroupingMode = 'type' | 'country' | 'strategy' | 'custom';
 interface FilterRule {
     type: string;
@@ -251,9 +284,14 @@ declare class OfferItem {
     readonly totalPrice: number;
     constructor(config: ItemConfig);
     update(fields: Partial<ItemConfig>): OfferItem;
-    roundCustomerPrice(step?: number): OfferItem;
-    roundGlassPrice(step?: number): OfferItem;
-    roundPourVolumePrices(step?: number): OfferItem;
+    /**
+     * Round the customer price. Accepts a bare step (legacy), a preset name
+     * ('whole', 'half_up', 'charm_49', ...) or a RoundingRule. Rounding never
+     * pushes the price below cost incl. VAT (gross >= 0), stepping up instead.
+     */
+    roundCustomerPrice(rule?: RoundInput): OfferItem;
+    roundGlassPrice(rule?: RoundInput): OfferItem;
+    roundPourVolumePrices(rule?: RoundInput): OfferItem;
     /** Set or update a pour volume. If volume exists, update price/name. If not, add it. */
     setPourVolume(pv: PourVolume): OfferItem;
     /** Remove a pour volume by ml value */
@@ -370,17 +408,38 @@ declare class Offer {
     /**
      * Bulk update field across multiple items
      */
-    bulkUpdateField(ids: string[] | undefined, field: keyof ItemConfig, value: any): Offer;
-    setMargin(value: number, ids?: string[]): Offer;
-    setGross(value: number, ids?: string[]): Offer;
-    setDiscount(value: number, ids?: string[]): Offer;
+    /**
+     * Bulk update field across multiple items.
+     * `opts.round` (step | preset | rule) rounds each affected item's
+     * customer price right after the update — pass it on price-deriving
+     * fields (margin, gross, discount, vatRate, customerPrice). On
+     * glassPrice it rounds the glass price instead.
+     */
+    bulkUpdateField(ids: string[] | undefined, field: keyof ItemConfig, value: any, opts?: {
+        round?: RoundInput;
+    }): Offer;
+    setMargin(value: number, ids?: string[], opts?: {
+        round?: RoundInput;
+    }): Offer;
+    setGross(value: number, ids?: string[], opts?: {
+        round?: RoundInput;
+    }): Offer;
+    setDiscount(value: number, ids?: string[], opts?: {
+        round?: RoundInput;
+    }): Offer;
     setQuantity(value: number, ids?: string[]): Offer;
-    setVatRate(value: number, ids?: string[]): Offer;
-    setPourVolume(pv: PourVolume, ids?: string[]): Offer;
-    setGlassPrice(value: number, ids?: string[]): Offer;
-    roundCustomerPrices(step?: number, ids?: string[]): Offer;
-    roundGlassPrices(step?: number, ids?: string[]): Offer;
-    roundPourVolumePrices(step?: number, ids?: string[]): Offer;
+    setVatRate(value: number, ids?: string[], opts?: {
+        round?: RoundInput;
+    }): Offer;
+    setPourVolume(pv: PourVolume, ids?: string[], opts?: {
+        round?: RoundInput;
+    }): Offer;
+    setGlassPrice(value: number, ids?: string[], opts?: {
+        round?: RoundInput;
+    }): Offer;
+    roundCustomerPrices(rule?: RoundInput, ids?: string[]): Offer;
+    roundGlassPrices(rule?: RoundInput, ids?: string[]): Offer;
+    roundPourVolumePrices(rule?: RoundInput, ids?: string[]): Offer;
     setUnit(unit: string, ids?: string[]): Offer;
     /** The negotiation conversation, or undefined for a never-shared draft. */
     get negotiation(): NegotiationState | undefined;
@@ -666,4 +725,4 @@ declare function deriveUnpromptedChanges(view: NegotiationOfferView, opts?: {
     ignoreRequests?: boolean;
 }): UnpromptedChange[];
 
-export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_OFFER_STATUS, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, type RequestKind, type RequestOutcome, type ResolvedRequest, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, roundBaseline, sortItems, validateCategoryName };
+export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_OFFER_STATUS, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, ROUNDING_PRESETS, type RequestKind, type RequestOutcome, type ResolvedRequest, type RoundInput, type RoundingPreset, type RoundingRule, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, applyRounding, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, resolveRounding, roundBaseline, sortItems, validateCategoryName };

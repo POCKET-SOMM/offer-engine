@@ -14,11 +14,12 @@ The foundational unit representing a line item in an offer.
 - **Financial Fields**: `price`, `discount`, `margin`, `gross`, `vatRate`, `vatAmount`, `customerPrice`, `glassPrice`.
 - **Packaging**: Supports units (e.g., `bottle`, `case_6`, `case_12`).
 - **Update Patterns**: Use `.update({ ... })` for single or multiple field changes.
-- **Rounding**: `.roundCustomerPrice(step)` and `.roundGlassPrice(step)` for precision adjustments.
+- **Rounding**: `.roundCustomerPrice(rule)`, `.roundGlassPrice(rule)`, `.roundPourVolumePrices(rule)` — `rule` is a bare step number (legacy), a preset name (`'whole' | 'whole_up' | 'half' | 'half_up' | 'charm_99' | 'charm_95' | 'charm_49' | 'five' | 'none'`), or a `RoundingRule` `{ step, ending?, direction? }`. `roundCustomerPrice` never rounds below cost incl. VAT (steps up instead), so `gross >= 0` always holds.
 
 ### Offer (`src/Offer.ts`)
 A collection of `OfferItem`s with aggregated totals.
-- **Bulk Operations**: `setMargin`, `setGross`, `setDiscount`, `setQuantity`, `setVatRate`, `setGlassPrice`, `setUnit`.
+- **Bulk Operations**: `setMargin`, `setGross`, `setDiscount`, `setQuantity`, `setVatRate`, `setGlassPrice`, `setUnit`. Price-deriving setters (`setMargin/setGross/setDiscount/setVatRate/setGlassPrice/setPourVolume` and `bulkUpdateField`) accept a trailing `opts: { round?: RoundInput }` that rounds affected prices right after the mutation, e.g. `offer.setMargin(70, ids, { round: 'charm_49' })`.
+- **Rounding utilities** (`src/utils/rounding.ts`, exported): `applyRounding(value, rule, { min? })`, `resolveRounding(input)`, `ROUNDING_PRESETS`; types `RoundingRule`, `RoundingPreset`, `RoundInput`. `min` is a hard floor — the result re-snaps upward onto the grid, never below it.
 - **Totals**: Provides `totalNet`, `totalVat`, and `totalGross` for the entire offer.
 - **Updates**: Individual item updates via `updateItem(id, fields|fn)`.
 - **Status**: `offer.status` (getter, defaults to `'draft'`) and `setStatus(status)`. Valid values:

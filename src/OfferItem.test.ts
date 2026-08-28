@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { round } from './utils/math.js';
 import { OfferItem } from './OfferItem.js';
 import { UNIT_MULTIPLIERS } from './constants.js';
 
@@ -222,6 +223,41 @@ describe('OfferItem', () => {
 
             const roundedHalf = item.roundGlassPrice(0.5);
             expect(roundedHalf.glassPrice).toBe(12.5);
+        });
+
+        it('accepts preset names and keeps derived fields consistent', () => {
+            const item = new OfferItem({ price: 5.91, vatRate: 25.5, margin: 70 });
+            // cost 5.91, margin 70%, VAT 25.5% -> customerPrice 24.72
+            expect(item.customerPrice).toBe(24.72);
+
+            const charm = item.roundCustomerPrice('charm_49');
+            expect(charm.customerPrice).toBe(24.49);
+            expect(round(charm.pricePerBottle + charm.gross + charm.vatAmount)).toBe(charm.customerPrice);
+
+            const whole = item.roundCustomerPrice('whole');
+            expect(whole.customerPrice).toBe(25);
+            expect(round(whole.pricePerBottle + whole.gross + whole.vatAmount)).toBe(whole.customerPrice);
+        });
+
+        it('never rounds the customer price below cost incl. VAT', () => {
+            // margin 0 -> customerPrice = cost incl VAT = 12.55; 'five' would snap to 15 up, 10 down
+            const item = new OfferItem({ price: 10, vatRate: 25.5, margin: 0 });
+            expect(item.customerPrice).toBe(12.55);
+            const rounded = item.roundCustomerPrice({ step: 5, direction: 'down' });
+            expect(rounded.customerPrice).toBe(15);
+            expect(rounded.gross).toBeGreaterThanOrEqual(0);
+        });
+
+        it('rounds pour volume prices with presets', () => {
+            const item = new OfferItem({
+                price: 10,
+                pourVolumes: [
+                    { volume: 120, price: 7.23 },
+                    { volume: 160, price: 9.81 },
+                ],
+            });
+            const rounded = item.roundPourVolumePrices('half_up');
+            expect(rounded.pourVolumes.map(pv => pv.price)).toEqual([7.5, 10]);
         });
     });
 

@@ -9,6 +9,10 @@ export {
 export type { OfferStatus } from './constants.js';
 export type { PourVolume, ItemConfig, OfferSummary, OfferSummaryGroup, OfferThumbnail } from './types.js';
 
+// Rounding
+export { applyRounding, resolveRounding, ROUNDING_PRESETS } from './utils/rounding.js';
+export type { RoundingRule, RoundingPreset, RoundInput } from './utils/rounding.js';
+
 // Sorting
 export { sortItems, DEFAULT_SORT } from './sorting/sortItems.js';
 export type { SortConfig, SortField, SortDirection } from './sorting/sortItems.js';
