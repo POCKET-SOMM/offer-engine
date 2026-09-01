@@ -7,7 +7,7 @@ import {
     type OfferStatus,
 } from './constants.js';
 import { OfferItem } from './OfferItem.js';
-import type { ItemConfig, OfferTotals, PourVolume, OfferSummary, OfferSummaryGroup, OfferThumbnail } from './types.js';
+import type { ItemConfig, OfferTotals, PourVolume, PourStrategyInput, PourPriceEntry, OfferSummary, OfferSummaryGroup, OfferThumbnail } from './types.js';
 import { round } from './utils/math.js';
 import type { RoundInput } from './utils/rounding.js';
 import { normalizeCustomGrouping, validateCategoryName } from './grouping/normalize.js';
@@ -240,6 +240,54 @@ export class Offer {
         const newItems = this.items.map(item => {
             if (ids && !ids.includes(item.id)) return item;
             let updated = item.setPourVolume(pv);
+            if (opts.round !== undefined && opts.round !== null) {
+                updated = updated.roundPourVolumePrices(opts.round);
+            }
+            return updated;
+        });
+        return new Offer({ ...this, items: newItems });
+    }
+
+    /**
+     * Price one pour size across many items from a single named strategy.
+     * Each item derives its own price from its own state, so N items yield N
+     * different pour prices in ONE call. Omitted `ids` means every item.
+     */
+    setPourVolumeByStrategy(
+        input: PourStrategyInput,
+        ids?: string[],
+        opts: { round?: RoundInput } = {},
+    ): Offer {
+        const newItems = this.items.map(item => {
+            if (ids && !ids.includes(item.id)) return item;
+            let updated = item.setPourVolumeByStrategy(input);
+            if (opts.round !== undefined && opts.round !== null) {
+                updated = updated.roundPourVolumePrices(opts.round);
+            }
+            return updated;
+        });
+        return new Offer({ ...this, items: newItems });
+    }
+
+    /**
+     * Set one pour size with an EXPLICIT price per item, in a single call —
+     * for prices the caller computed itself (a custom strategy, or prices the
+     * user dictated per bottle). Items absent from `prices` are untouched.
+     */
+    setPourVolumePerItem(
+        volume: number,
+        prices: PourPriceEntry[],
+        opts: { round?: RoundInput; name?: string } = {},
+    ): Offer {
+        const priceById = new Map(prices.map(entry => [entry.id, entry.price]));
+        const newItems = this.items.map(item => {
+            const price = priceById.get(item.id);
+            if (price === undefined) return item;
+            let updated = item.setPourVolume({
+                volume,
+                price,
+                ...(opts.name ? { name: opts.name } : {}),
+            });
             if (opts.round !== undefined && opts.round !== null) {
                 updated = updated.roundPourVolumePrices(opts.round);
             }

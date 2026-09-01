@@ -1,7 +1,7 @@
 import { round } from './utils/math.js';
 import { applyRounding, type RoundInput } from './utils/rounding.js';
-import { UNIT_MULTIPLIERS } from './constants.js';
-import type { ItemConfig, PourVolume } from './types.js';
+import { UNIT_MULTIPLIERS, DEFAULT_BOTTLE_ML, DEFAULT_POUR_PREMIUM } from './constants.js';
+import type { ItemConfig, PourVolume, PourStrategyInput } from './types.js';
 
 export class OfferItem {
     public readonly id: string;
@@ -182,6 +182,46 @@ export class OfferItem {
     setPourVolume(pv: PourVolume): OfferItem {
         const existing = this.pourVolumes.filter(p => p.volume !== pv.volume);
         return this.update({ pourVolumes: [...existing, pv] });
+    }
+
+    /**
+     * Price one pour of THIS item under a named strategy. Each item derives
+     * from its own state, so a single strategy produces a different price per
+     * item — the same policy-not-price shape as setMargin.
+     *
+     * The per-ml floor (a pour is never cheaper per-ml than the bottle) is
+     * advisory: nothing is clamped here, matching roundPourVolumePrices.
+     */
+    pourPriceFor(input: PourStrategyInput): number {
+        const bottleVolume = input.bottleVolume ?? DEFAULT_BOTTLE_ML;
+        if (!(input.volume > 0) || !(bottleVolume > 0)) return 0;
+        const share = input.volume / bottleVolume;
+
+        switch (input.strategy) {
+            case 'bottle_recovery':
+                return round(this.pricePerBottle);
+            case 'proportional_premium': {
+                const premium = input.premium ?? DEFAULT_POUR_PREMIUM;
+                return round(this.customerPrice * share * (1 + premium));
+            }
+            case 'margin_parity': {
+                const cost = this.pricePerBottle * share;
+                const marginFraction = this.margin / 100;
+                // A margin of 100%+ has no finite price; fall back to cost.
+                return round(marginFraction >= 1 ? cost : cost / (1 - marginFraction));
+            }
+            default:
+                throw new Error(`Unknown pour strategy: ${input.strategy}`);
+        }
+    }
+
+    /** Set a pour volume whose price this item derives from a named strategy. */
+    setPourVolumeByStrategy(input: PourStrategyInput): OfferItem {
+        return this.setPourVolume({
+            volume: input.volume,
+            price: this.pourPriceFor(input),
+            ...(input.name ? { name: input.name } : {}),
+        });
     }
 
     /** Remove a pour volume by ml value */

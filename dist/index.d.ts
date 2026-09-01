@@ -1,3 +1,5 @@
+declare const DEFAULT_BOTTLE_ML = 750;
+declare const DEFAULT_POUR_PREMIUM = 0.15;
 declare const OFFER_STATUSES: readonly ["draft", "sent", "accepted"];
 type OfferStatus = (typeof OFFER_STATUSES)[number];
 declare const DEFAULT_OFFER_STATUS: OfferStatus;
@@ -204,6 +206,30 @@ interface PourVolume {
     price: number;
     name?: string;
 }
+/**
+ * Named by-the-glass pricing policies. Like a margin, a strategy is applied
+ * once to many items and each item derives its own price from its own state,
+ * so one call yields N different pour prices.
+ *
+ * - `bottle_recovery`      — the first pour pays the bottle: price = net cost.
+ * - `proportional_premium` — guest bottle price scaled to the pour, plus a
+ *                            service premium.
+ * - `margin_parity`        — pour priced to hit the item's own bottle margin.
+ */
+type PourStrategy = 'bottle_recovery' | 'proportional_premium' | 'margin_parity';
+declare const POUR_STRATEGIES: readonly PourStrategy[];
+interface PourStrategyInput {
+    strategy: PourStrategy;
+    volume: number;
+    premium?: number;
+    bottleVolume?: number;
+    name?: string;
+}
+/** One explicit per-item pour price, for prices the caller computed itself. */
+interface PourPriceEntry {
+    id: string;
+    price: number;
+}
 interface OfferThumbnail {
     imgUrl?: string;
     title?: string;
@@ -294,6 +320,17 @@ declare class OfferItem {
     roundPourVolumePrices(rule?: RoundInput): OfferItem;
     /** Set or update a pour volume. If volume exists, update price/name. If not, add it. */
     setPourVolume(pv: PourVolume): OfferItem;
+    /**
+     * Price one pour of THIS item under a named strategy. Each item derives
+     * from its own state, so a single strategy produces a different price per
+     * item — the same policy-not-price shape as setMargin.
+     *
+     * The per-ml floor (a pour is never cheaper per-ml than the bottle) is
+     * advisory: nothing is clamped here, matching roundPourVolumePrices.
+     */
+    pourPriceFor(input: PourStrategyInput): number;
+    /** Set a pour volume whose price this item derives from a named strategy. */
+    setPourVolumeByStrategy(input: PourStrategyInput): OfferItem;
     /** Remove a pour volume by ml value */
     removePourVolume(volume: number): OfferItem;
     /** Remove all pour volumes */
@@ -433,6 +470,23 @@ declare class Offer {
     }): Offer;
     setPourVolume(pv: PourVolume, ids?: string[], opts?: {
         round?: RoundInput;
+    }): Offer;
+    /**
+     * Price one pour size across many items from a single named strategy.
+     * Each item derives its own price from its own state, so N items yield N
+     * different pour prices in ONE call. Omitted `ids` means every item.
+     */
+    setPourVolumeByStrategy(input: PourStrategyInput, ids?: string[], opts?: {
+        round?: RoundInput;
+    }): Offer;
+    /**
+     * Set one pour size with an EXPLICIT price per item, in a single call —
+     * for prices the caller computed itself (a custom strategy, or prices the
+     * user dictated per bottle). Items absent from `prices` are untouched.
+     */
+    setPourVolumePerItem(volume: number, prices: PourPriceEntry[], opts?: {
+        round?: RoundInput;
+        name?: string;
     }): Offer;
     setGlassPrice(value: number, ids?: string[], opts?: {
         round?: RoundInput;
@@ -725,4 +779,4 @@ declare function deriveUnpromptedChanges(view: NegotiationOfferView, opts?: {
     ignoreRequests?: boolean;
 }): UnpromptedChange[];
 
-export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_OFFER_STATUS, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, ROUNDING_PRESETS, type RequestKind, type RequestOutcome, type ResolvedRequest, type RoundInput, type RoundingPreset, type RoundingRule, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, applyRounding, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, resolveRounding, roundBaseline, sortItems, validateCategoryName };
+export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_BOTTLE_ML, DEFAULT_OFFER_STATUS, DEFAULT_POUR_PREMIUM, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, POUR_STRATEGIES, type PourPriceEntry, type PourStrategy, type PourStrategyInput, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, ROUNDING_PRESETS, type RequestKind, type RequestOutcome, type ResolvedRequest, type RoundInput, type RoundingPreset, type RoundingRule, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, applyRounding, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, resolveRounding, roundBaseline, sortItems, validateCategoryName };

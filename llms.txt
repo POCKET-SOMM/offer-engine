@@ -19,6 +19,20 @@ The foundational unit representing a line item in an offer.
 ### Offer (`src/Offer.ts`)
 A collection of `OfferItem`s with aggregated totals.
 - **Bulk Operations**: `setMargin`, `setGross`, `setDiscount`, `setQuantity`, `setVatRate`, `setGlassPrice`, `setUnit`. Price-deriving setters (`setMargin/setGross/setDiscount/setVatRate/setGlassPrice/setPourVolume` and `bulkUpdateField`) accept a trailing `opts: { round?: RoundInput }` that rounds affected prices right after the mutation, e.g. `offer.setMargin(70, ids, { round: 'charm_49' })`.
+- **Pour pricing in bulk**: `setPourVolumeByStrategy(input, ids?, opts?)` prices one pour size
+  across many items from a single named strategy — like `setMargin`, the input is a *policy*, not
+  a price, so each item derives its own pour price from its own state and N items yield N
+  different prices in ONE call. `input` is `{ strategy, volume, premium?, bottleVolume?, name? }`
+  with `strategy` one of `POUR_STRATEGIES`: `'bottle_recovery'` (price = the item's net
+  `pricePerBottle`, i.e. the post-discount cost, not the `price` list field),
+  `'proportional_premium'` (`customerPrice × volume/bottleVolume × (1 + premium)`, premium
+  defaults to `DEFAULT_POUR_PREMIUM` = 0.15), `'margin_parity'` (pour priced to hit the item's
+  own bottle margin). An unknown strategy throws rather than silently pricing pours at 0.
+  For prices the caller computed itself (a custom strategy, or per-bottle prices a user
+  dictated), `setPourVolumePerItem(volume, prices, opts?)` applies an explicit `{ id, price }[]`
+  in one call; items absent from the list are untouched.
+  The per-ml floor (a pour is never cheaper per-ml than the bottle) is **advisory** — neither
+  method clamps, matching `roundPourVolumePrices`'s `min: 0`.
 - **Rounding utilities** (`src/utils/rounding.ts`, exported): `applyRounding(value, rule, { min? })`, `resolveRounding(input)`, `ROUNDING_PRESETS`; types `RoundingRule`, `RoundingPreset`, `RoundInput`. `min` is a hard floor — the result re-snaps upward onto the grid, never below it.
 - **Totals**: Provides `totalNet`, `totalVat`, and `totalGross` for the entire offer.
 - **Updates**: Individual item updates via `updateItem(id, fields|fn)`.

@@ -152,6 +152,92 @@ describe('Bulk Operations', () => {
         expect(updated.items[0]?.pourVolumes[0]?.price).toBe(10);
     });
 
+    it('setPourVolumeByStrategy prices each item from its OWN state in one call', () => {
+        const o = new Offer({
+            items: [
+                new OfferItem({ price: 10, id: 'a', vatRate: 0, margin: 50 }),
+                new OfferItem({ price: 30, id: 'b', vatRate: 0, margin: 50 }),
+            ],
+        });
+        const updated = o.setPourVolumeByStrategy({ strategy: 'bottle_recovery', volume: 125 });
+        // One call, two different prices — the whole point of the strategy shape.
+        expect(updated.items[0]?.pourVolumes[0]?.price).toBe(10);
+        expect(updated.items[1]?.pourVolumes[0]?.price).toBe(30);
+    });
+
+    it('bottle_recovery uses net cost, not the pre-discount list price', () => {
+        const o = new Offer({
+            items: [new OfferItem({ price: 100, discount: 20, id: 'a', vatRate: 0 })],
+        });
+        const updated = o.setPourVolumeByStrategy({ strategy: 'bottle_recovery', volume: 125 });
+        // pricePerBottle = 100 * (1 - 0.20) = 80, NOT the 100 list price.
+        expect(o.items[0]?.pricePerBottle).toBe(80);
+        expect(updated.items[0]?.pourVolumes[0]?.price).toBe(80);
+    });
+
+    it('proportional_premium scales the guest price by the pour share plus premium', () => {
+        const o = new Offer({
+            items: [new OfferItem({ price: 10, id: 'a', vatRate: 0, customerPrice: 60 })],
+        });
+        const updated = o.setPourVolumeByStrategy({
+            strategy: 'proportional_premium',
+            volume: 125,
+            premium: 0.2,
+        });
+        // 60 * (125/750) * 1.2 = 12
+        expect(updated.items[0]?.pourVolumes[0]?.price).toBe(12);
+    });
+
+    it('margin_parity prices the pour at the item own bottle margin', () => {
+        const o = new Offer({
+            items: [new OfferItem({ price: 60, id: 'a', vatRate: 0, margin: 50 })],
+        });
+        const updated = o.setPourVolumeByStrategy({ strategy: 'margin_parity', volume: 125 });
+        // cost = 60 * (125/750) = 10; at 50% margin -> 10 / 0.5 = 20
+        expect(updated.items[0]?.pourVolumes[0]?.price).toBe(20);
+    });
+
+    it('setPourVolumeByStrategy touches only targeted ids and can round', () => {
+        const o = new Offer({
+            items: [
+                new OfferItem({ price: 9.81, id: 'a', vatRate: 0 }),
+                new OfferItem({ price: 12.4, id: 'b', vatRate: 0 }),
+            ],
+        });
+        const updated = o.setPourVolumeByStrategy(
+            { strategy: 'bottle_recovery', volume: 125 },
+            ['a'],
+            { round: 'half_up' },
+        );
+        expect(updated.items[0]?.pourVolumes[0]?.price).toBe(10);
+        expect(updated.items[1]?.pourVolumes).toHaveLength(0);
+    });
+
+    it('setPourVolumePerItem applies explicit per-item prices in one call', () => {
+        const o = new Offer({
+            items: [
+                new OfferItem({ price: 10, id: 'a', vatRate: 0 }),
+                new OfferItem({ price: 20, id: 'b', vatRate: 0 }),
+                new OfferItem({ price: 30, id: 'c', vatRate: 0 }),
+            ],
+        });
+        const updated = o.setPourVolumePerItem(125, [
+            { id: 'a', price: 7 },
+            { id: 'c', price: 11.4 },
+        ], { round: 'half_up', name: 'Standard' });
+        expect(updated.items[0]?.pourVolumes[0]).toMatchObject({ price: 7, name: 'Standard' });
+        // Items absent from the price list are untouched.
+        expect(updated.items[1]?.pourVolumes).toHaveLength(0);
+        expect(updated.items[2]?.pourVolumes[0]?.price).toBe(11.5);
+    });
+
+    it('an unknown strategy throws rather than silently pricing pours at zero', () => {
+        const o = new Offer({ items: [new OfferItem({ price: 10, id: 'a' })] });
+        expect(() =>
+            o.setPourVolumeByStrategy({ strategy: 'nonsense' as any, volume: 125 }),
+        ).toThrow(/Unknown pour strategy/);
+    });
+
     it('roundCustomerPrices accepts a preset name', () => {
         const o = new Offer({
             items: [new OfferItem({ price: 5.91, id: 'a', vatRate: 25.5, margin: 70 })],
