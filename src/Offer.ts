@@ -21,6 +21,8 @@ import type {
     NegotiationLogLine,
     NegotiationState,
     OfferRecipient,
+    NegotiationAcceptance,
+    NegotiationVersion,
 } from './negotiation/types.js';
 
 export interface OfferConfig {
@@ -34,6 +36,13 @@ export interface OfferConfig {
      *  older stored blobs and callers keep working. Prefer `menus`. */
     menu?: any;
     data?: Record<string, any>;
+}
+
+/** A trimmed cover note as a spreadable field — absent (not `undefined`) when
+ *  empty, so untouched blobs keep their exact shape. */
+function messageField(message: string | null | undefined): { message?: string } {
+    const trimmed = message?.trim();
+    return trimmed ? { message: trimmed } : {};
 }
 
 export class Offer {
@@ -410,13 +419,15 @@ export class Offer {
      * (roundBaseline), so outcomes keep reading correctly after the send.
      * `sentAt` is caller-supplied so the engine stays deterministic.
      */
-    sendVersion({ senderName, sentAt, log = [] }: {
+    sendVersion({ senderName, sentAt, log = [], message }: {
         senderName?: string;
         sentAt: string;
         log?: NegotiationLogLine[];
+        /** Cover note for this transmission. Stored only when non-empty. */
+        message?: string | null;
     }): Offer {
         const neg = this._negotiationOrFresh();
-        const version = {
+        const version: NegotiationVersion = {
             id: crypto.randomUUID(),
             number: neg.versions.length + 1,
             sender: 'seller' as const,
@@ -424,6 +435,7 @@ export class Offer {
             sentAt,
             log,
             baseline: buildBaseline(this, this.totals.totalPrice),
+            ...messageField(message),
         };
         return this._withNegotiation(
             { ...neg, versions: [...neg.versions, version], turn: 'buyer' },
@@ -436,15 +448,17 @@ export class Offer {
      * identity and its `from` quantity off the current line, snapshots the
      * baseline, and passes the turn to the seller.
      */
-    submitRequests({ requests, senderName, sentAt, log = [] }: {
+    submitRequests({ requests, senderName, sentAt, log = [], message }: {
         requests: ChangeRequestInput[];
         senderName?: string;
         sentAt: string;
         log?: NegotiationLogLine[];
+        /** Cover note for this transmission. Stored only when non-empty. */
+        message?: string | null;
     }): Offer {
         const neg = this._negotiationOrFresh();
         const versionId = crypto.randomUUID();
-        const version = {
+        const version: NegotiationVersion = {
             id: versionId,
             number: neg.versions.length + 1,
             sender: 'buyer' as const,
@@ -452,6 +466,7 @@ export class Offer {
             sentAt,
             log,
             baseline: buildBaseline(this, this.totals.totalPrice),
+            ...messageField(message),
         };
         const stamped: ChangeRequest[] = requests.map((input) => {
             const target = input.lineId != null ? itemByLineId(this, input.lineId) : undefined;
@@ -541,10 +556,25 @@ export class Offer {
         return new Offer({ ...this, data });
     }
 
-    /** Buyer accepts the offer as it stands. Ends the conversation. */
-    acceptNegotiation(): Offer {
+    /**
+     * Buyer accepts the offer as it stands. Ends the conversation. No version
+     * is pushed — the offer itself doesn't move — so the closing note (and
+     * when/who) is recorded as `acceptance` when `sentAt` is supplied. Calling
+     * it bare still just flips the state, as before.
+     */
+    acceptNegotiation({ sentAt, senderName, message }: {
+        sentAt?: string;
+        senderName?: string;
+        message?: string | null;
+    } = {}): Offer {
         const neg = this._negotiationOrFresh();
-        return this._withNegotiation({ ...neg, state: 'accepted' }, { status: 'accepted' });
+        const acceptance: NegotiationAcceptance | undefined = sentAt
+            ? { sentAt, ...(senderName ? { senderName } : {}), ...messageField(message) }
+            : undefined;
+        return this._withNegotiation(
+            { ...neg, state: 'accepted', ...(acceptance ? { acceptance } : {}) },
+            { status: 'accepted' },
+        );
     }
 
     // --- Grouping ---

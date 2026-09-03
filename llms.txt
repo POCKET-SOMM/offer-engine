@@ -129,10 +129,16 @@ display `log`, and a compact `baseline` of the lines as transmitted), and the li
   the latest version's baseline (quantity/price/swap/add/remove), excluding edits a live request
   explains. Reverting the edit removes the entry.
 - **Flow methods on `Offer`** (immutable, timestamps caller-supplied — the engine never reads the
-  clock): `sendVersion({ senderName, sentAt, log })` (seller; also sets status `'sent'`),
-  `submitRequests({ requests, senderName, sentAt })` (buyer; stamps `from` off current lines, and
-  clears `notes` — see below), `declineRequest/undeclineRequest(id)`, `setRequestAnswer(id, note)`,
-  `markFreeTextAnswered(id)`, `acceptNegotiation()`.
+  clock): `sendVersion({ senderName, sentAt, log, message })` (seller; also sets status `'sent'`),
+  `submitRequests({ requests, senderName, sentAt, log, message })` (buyer; stamps `from` off current
+  lines, and clears `notes` — see below), `declineRequest/undeclineRequest(id)`,
+  `setRequestAnswer(id, note)`, `markFreeTextAnswered(id)`,
+  `acceptNegotiation({ sentAt, senderName, message })` (bare call still works).
+- **Per-transmission message**: every version carries an optional `message` — the sender's cover
+  note for that round, stored trimmed and only when non-empty (the key is absent otherwise). It is
+  distinct from per-line `note`s and from the frozen `log`. Accepting pushes no version, so the
+  buyer's closing note is recorded as `negotiation.acceptance` (`{ sentAt, senderName?, message? }`)
+  whenever `acceptNegotiation` is given a `sentAt`.
 - **Notes** (`notes` getter + `setLineNote(lineId, note)`, stored at `offer.data.notes`,
   `Record<string, string>`): a freeform annotation on a line, independent of `negotiation` — works
   on a never-shared draft same as on a live offer, since it isn't itself a negotiated change (those

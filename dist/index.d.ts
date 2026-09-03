@@ -131,6 +131,9 @@ interface NegotiationVersion {
     sentAt: string;
     log: NegotiationLogLine[];
     baseline: NegotiationBaseline;
+    /** Cover note from the sender for this transmission, captured at send.
+     *  Free text, shown as a quote. Absent when nothing was written. */
+    message?: string | undefined;
 }
 /** A buyer ask from the live round. `from`/`declined`/`answerNote`/
  *  `answeredFreeText` are the only stored resolution state — everything else
@@ -183,6 +186,17 @@ interface NegotiationState {
     /** The live round's requests only. Frozen into the answering version's log
      *  at send and cleared. */
     requests: ChangeRequest[];
+    /** How the conversation ended, once the buyer accepts. Accepting pushes no
+     *  version (nothing about the offer changes), so the closing note lives
+     *  here instead. Absent on conversations accepted before it existed. */
+    acceptance?: NegotiationAcceptance | undefined;
+}
+/** The buyer's acceptance: when, by whom, and any closing note. */
+interface NegotiationAcceptance {
+    /** ISO timestamp, supplied by the caller (the engine never reads the clock). */
+    sentAt: string;
+    senderName?: string | undefined;
+    message?: string | undefined;
 }
 /** Who the offer was sent to. Captured when the rep shares it, and kept if the
  *  share is later withdrawn — re-sending should not ask again. This is the only
@@ -527,21 +541,25 @@ declare class Offer {
      * (roundBaseline), so outcomes keep reading correctly after the send.
      * `sentAt` is caller-supplied so the engine stays deterministic.
      */
-    sendVersion({ senderName, sentAt, log }: {
+    sendVersion({ senderName, sentAt, log, message }: {
         senderName?: string;
         sentAt: string;
         log?: NegotiationLogLine[];
+        /** Cover note for this transmission. Stored only when non-empty. */
+        message?: string | null;
     }): Offer;
     /**
      * Buyer transmission: a round of change requests. Stamps each request's
      * identity and its `from` quantity off the current line, snapshots the
      * baseline, and passes the turn to the seller.
      */
-    submitRequests({ requests, senderName, sentAt, log }: {
+    submitRequests({ requests, senderName, sentAt, log, message }: {
         requests: ChangeRequestInput[];
         senderName?: string;
         sentAt: string;
         log?: NegotiationLogLine[];
+        /** Cover note for this transmission. Stored only when non-empty. */
+        message?: string | null;
     }): Offer;
     /** Explicitly decline a request — the one outcome the items can't express. */
     declineRequest(id: string): Offer;
@@ -573,8 +591,17 @@ declare class Offer {
      * `canWithdrawShare`.
      */
     withdrawShare(): Offer;
-    /** Buyer accepts the offer as it stands. Ends the conversation. */
-    acceptNegotiation(): Offer;
+    /**
+     * Buyer accepts the offer as it stands. Ends the conversation. No version
+     * is pushed — the offer itself doesn't move — so the closing note (and
+     * when/who) is recorded as `acceptance` when `sentAt` is supplied. Calling
+     * it bare still just flips the state, as before.
+     */
+    acceptNegotiation({ sentAt, senderName, message }?: {
+        sentAt?: string;
+        senderName?: string;
+        message?: string | null;
+    }): Offer;
     private _withGrouping;
     private _grouping;
     private _customCategories;
@@ -779,4 +806,4 @@ declare function deriveUnpromptedChanges(view: NegotiationOfferView, opts?: {
     ignoreRequests?: boolean;
 }): UnpromptedChange[];
 
-export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_BOTTLE_ML, DEFAULT_OFFER_STATUS, DEFAULT_POUR_PREMIUM, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, POUR_STRATEGIES, type PourPriceEntry, type PourStrategy, type PourStrategyInput, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, ROUNDING_PRESETS, type RequestKind, type RequestOutcome, type ResolvedRequest, type RoundInput, type RoundingPreset, type RoundingRule, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, applyRounding, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, resolveRounding, roundBaseline, sortItems, validateCategoryName };
+export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_BOTTLE_ML, DEFAULT_OFFER_STATUS, DEFAULT_POUR_PREMIUM, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationAcceptance, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, POUR_STRATEGIES, type PourPriceEntry, type PourStrategy, type PourStrategyInput, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, ROUNDING_PRESETS, type RequestKind, type RequestOutcome, type ResolvedRequest, type RoundInput, type RoundingPreset, type RoundingRule, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, applyRounding, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, resolveRounding, roundBaseline, sortItems, validateCategoryName };

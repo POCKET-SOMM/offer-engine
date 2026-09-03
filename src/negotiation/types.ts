@@ -66,6 +66,9 @@ export interface NegotiationVersion {
     sentAt: string;
     log: NegotiationLogLine[];
     baseline: NegotiationBaseline;
+    /** Cover note from the sender for this transmission, captured at send.
+     *  Free text, shown as a quote. Absent when nothing was written. */
+    message?: string | undefined;
 }
 
 /** A buyer ask from the live round. `from`/`declined`/`answerNote`/
@@ -121,6 +124,18 @@ export interface NegotiationState {
     /** The live round's requests only. Frozen into the answering version's log
      *  at send and cleared. */
     requests: ChangeRequest[];
+    /** How the conversation ended, once the buyer accepts. Accepting pushes no
+     *  version (nothing about the offer changes), so the closing note lives
+     *  here instead. Absent on conversations accepted before it existed. */
+    acceptance?: NegotiationAcceptance | undefined;
+}
+
+/** The buyer's acceptance: when, by whom, and any closing note. */
+export interface NegotiationAcceptance {
+    /** ISO timestamp, supplied by the caller (the engine never reads the clock). */
+    sentAt: string;
+    senderName?: string | undefined;
+    message?: string | undefined;
 }
 
 /** Who the offer was sent to. Captured when the rep shares it, and kept if the

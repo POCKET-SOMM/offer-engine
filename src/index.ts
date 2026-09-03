@@ -65,6 +65,7 @@ export type {
     ChangeRequest,
     ChangeRequestInput,
     NegotiationState,
+    NegotiationAcceptance,
     NegotiationSummary,
     OfferRecipient,
 } from './negotiation/types.js';
