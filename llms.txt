@@ -172,3 +172,9 @@ display `log`, and a compact `baseline` of the lines as transmitted), and the li
 - Always use the `update` methods rather than creating new objects from scratch if you want to preserve the "lock" on explicit targets.
 - The `dist/` directory is built using `tsup`. Run `npm run build` after changes.
 - Verification is done via `vitest`. Run `npm test`.
+
+### Convention: `OfferItem.fromWine` overrides that pin a price
+`fromWine(wine, overrides)` defaults `margin` to 70 only when the overrides do not pin the line's
+price: a `customerPrice` or `gross` override makes the constructor derive the margin from that pin
+(an explicit `margin` override still wins). Before v1.15.1 the default margin survived next to a
+pinned price and the item reported 70% at any guest price.

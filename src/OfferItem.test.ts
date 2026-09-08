@@ -380,6 +380,20 @@ describe('OfferItem', () => {
     });
 
     describe('fromWine static factory', () => {
+        it('derives the margin from a pinned customerPrice instead of the 70% default', () => {
+            const item = OfferItem.fromWine({ id: 'w', price: 8 }, { customerPrice: 34, vatRate: 25 });
+            expect(item.customerPrice).toBe(34);
+            // 34 / 1.25 = 27.2 ex VAT; gross 19.2; margin 19.2 / 27.2
+            expect(item.gross).toBeCloseTo(19.2, 2);
+            expect(item.margin).toBeCloseTo(70.59, 1);
+            expect(item.margin).not.toBe(70);
+        });
+
+        it('keeps an explicit margin override next to a pinned price', () => {
+            const item = OfferItem.fromWine({ id: 'w', price: 8 }, { customerPrice: 34, margin: 65 });
+            expect(item.margin).toBe(65);
+        });
+
         it('should create an OfferItem from a basic wine object', () => {
             const wine = {
                 id: 'wine-123',

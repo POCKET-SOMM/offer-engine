@@ -281,6 +281,12 @@ export class OfferItem {
             availableUnits.push(`case_${wine.bottlesPerCase}`);
         }
 
+        // The 70% margin is a default for pricing a line from scratch. An
+        // override that pins the guest price (customerPrice) or the profit
+        // (gross) is the same decision made the other way round, so the
+        // default steps aside and the constructor derives the margin from
+        // the pin — otherwise the item would report 70% at any price.
+        const pinsPrice = overrides?.customerPrice !== undefined || overrides?.gross !== undefined;
         const config: ItemConfig = {
             id: wine.id || crypto.randomUUID(),
             price: parseFloat(wine.price) || 0,
@@ -288,7 +294,7 @@ export class OfferItem {
             unit: availableUnits[0],
             quantity: 1,
             vatRate: 25.5,
-            margin: 70.0,
+            ...(pinsPrice ? {} : { margin: 70.0 }),
             tags: [],
             data: { ...wine, availableUnits },
             availableUnits,
