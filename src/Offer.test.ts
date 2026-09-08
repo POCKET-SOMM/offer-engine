@@ -663,6 +663,14 @@ describe('Summary', () => {
         expect(summary.groups.every((g) => g.count > 0)).toBe(true);
     });
 
+    it('flags a list takeover as its origin, and nothing else', () => {
+        const plain = new Offer({ items: [wine('a', 10)] });
+        expect(plain.toSummary().origin).toBeUndefined();
+        const takeover = new Offer({ items: [wine('a', 10)], data: { takeover: { version: 1, slots: [] } } });
+        expect(takeover.toSummary().origin).toBe('takeover');
+        expect(takeover.toJSON().summary.origin).toBe('takeover');
+    });
+
     it('returns an empty preview for an empty offer', () => {
         expect(new Offer().toSummary()).toEqual({
             thumbnails: [],

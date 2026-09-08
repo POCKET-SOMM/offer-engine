@@ -272,7 +272,12 @@ interface OfferSummary {
     negotiation?: NegotiationSummary;
     /** Who the offer was sent to — present once the rep has said. */
     recipient?: OfferRecipient;
+    /** How the offer came about, when that changes what a consumer shows for
+     *  it. 'takeover': built by reviewing a venue's existing wine list slot by
+     *  slot (`data.takeover` carries the record). Absent for ordinary offers. */
+    origin?: OfferOrigin;
 }
+type OfferOrigin = 'takeover';
 interface ItemConfig {
     price: number;
     discount?: number | undefined;
@@ -806,4 +811,4 @@ declare function deriveUnpromptedChanges(view: NegotiationOfferView, opts?: {
     ignoreRequests?: boolean;
 }): UnpromptedChange[];
 
-export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_BOTTLE_ML, DEFAULT_OFFER_STATUS, DEFAULT_POUR_PREMIUM, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationAcceptance, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, POUR_STRATEGIES, type PourPriceEntry, type PourStrategy, type PourStrategyInput, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, ROUNDING_PRESETS, type RequestKind, type RequestOutcome, type ResolvedRequest, type RoundInput, type RoundingPreset, type RoundingRule, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, applyRounding, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, resolveRounding, roundBaseline, sortItems, validateCategoryName };
+export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_BOTTLE_ML, DEFAULT_OFFER_STATUS, DEFAULT_POUR_PREMIUM, DEFAULT_SORT, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationAcceptance, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferOrigin, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, POUR_STRATEGIES, type PourPriceEntry, type PourStrategy, type PourStrategyInput, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, ROUNDING_PRESETS, type RequestKind, type RequestOutcome, type ResolvedRequest, type RoundInput, type RoundingPreset, type RoundingRule, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, applyRounding, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, resolveRounding, roundBaseline, sortItems, validateCategoryName };

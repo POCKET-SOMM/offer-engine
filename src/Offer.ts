@@ -781,6 +781,9 @@ export class Offer {
             menuTitles,
             // So a list row can say who the offer went to without loading items.
             ...(this.recipient ? { recipient: this.recipient } : {}),
+            // A list takeover is worth a badge on its own: the comparison
+            // view and the list-review document exist only for those.
+            ...(this.data?.['takeover'] ? { origin: 'takeover' as const } : {}),
             // Negotiation badge data for list rows ("Your move" / "Their move" /
             // "Approved") — only present once an offer has been shared.
             ...(negotiation ? {

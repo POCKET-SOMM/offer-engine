@@ -76,7 +76,13 @@ export interface OfferSummary {
     negotiation?: NegotiationSummary;
     /** Who the offer was sent to — present once the rep has said. */
     recipient?: OfferRecipient;
+    /** How the offer came about, when that changes what a consumer shows for
+     *  it. 'takeover': built by reviewing a venue's existing wine list slot by
+     *  slot (`data.takeover` carries the record). Absent for ordinary offers. */
+    origin?: OfferOrigin;
 }
+
+export type OfferOrigin = 'takeover';
 
 export interface ItemConfig {
     price: number;

@@ -96,6 +96,10 @@ by reading `record.data.summary`; the status lives one level deeper at `record.d
 NOTE: the summary is written at save time — offers stored before a summary-shape change keep the old
 shape until they're next saved.
 
+`summary.origin` is `'takeover'` when `data.takeover` is present (an offer built by reviewing a
+venue's existing wine list slot by slot — the consumer app owns that record's shape) and absent
+otherwise; list views badge on it without loading the data bag.
+
 ### Line identity: `item.lineId`
 Every `OfferItem` carries a durable `lineId` (defaults to `id`; stored blobs without it load as
 `lineId === id`). Unlike `id` — which `swapItem()` replaces and `removeItems()` drops — `lineId` is

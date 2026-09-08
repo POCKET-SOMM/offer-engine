@@ -7,7 +7,7 @@ export {
     SUMMARY_GROUP_THUMBNAIL_LIMIT,
 } from './constants.js';
 export type { OfferStatus } from './constants.js';
-export type { PourVolume, ItemConfig, OfferSummary, OfferSummaryGroup, OfferThumbnail } from './types.js';
+export type { PourVolume, ItemConfig, OfferSummary, OfferSummaryGroup, OfferThumbnail, OfferOrigin } from './types.js';
 export { POUR_STRATEGIES } from './types.js';
 export type { PourStrategy, PourStrategyInput, PourPriceEntry } from './types.js';
 export { DEFAULT_BOTTLE_ML, DEFAULT_POUR_PREMIUM } from './constants.js';
