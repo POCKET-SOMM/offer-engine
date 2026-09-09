@@ -231,6 +231,63 @@ describe('Bulk Operations', () => {
         expect(updated.items[2]?.pourVolumes[0]?.price).toBe(11.5);
     });
 
+    it('setCustomerPricePerItem applies a different guest price per item in one call', () => {
+        const o = new Offer({
+            items: [
+                new OfferItem({ price: 10, id: 'a', vatRate: 0 }),
+                new OfferItem({ price: 20, id: 'b', vatRate: 0 }),
+                new OfferItem({ price: 30, id: 'c', vatRate: 0 }),
+            ],
+        });
+        const updated = o.setCustomerPricePerItem([
+            { id: 'a', price: 34 },
+            { id: 'c', price: 95 },
+        ]);
+        expect(updated.items[0]?.customerPrice).toBe(34);
+        expect(updated.items[2]?.customerPrice).toBe(95);
+        // Items absent from the list are untouched.
+        expect(updated.items[1]?.customerPrice).toBe(o.items[1]?.customerPrice);
+    });
+
+    it('setCustomerPricePerItem re-derives each margin from that item own cost', () => {
+        // The point of the per-item form: one call, N different margins.
+        const o = new Offer({
+            items: [
+                new OfferItem({ price: 10, id: 'a', margin: 70, vatRate: 0 }),
+                new OfferItem({ price: 20, id: 'b', margin: 70, vatRate: 0 }),
+            ],
+        });
+        const updated = o.setCustomerPricePerItem([
+            { id: 'a', price: 40 },
+            { id: 'b', price: 40 },
+        ]);
+        expect(updated.items[0]?.margin).toBe(75);
+        expect(updated.items[1]?.margin).toBe(50);
+    });
+
+    it('setCustomerPricePerItem rounds only when asked', () => {
+        const o = new Offer({ items: [new OfferItem({ price: 10, id: 'a', vatRate: 0 })] });
+        expect(o.setCustomerPricePerItem([{ id: 'a', price: 24.73 }]).items[0]?.customerPrice).toBe(24.73);
+        expect(
+            o.setCustomerPricePerItem([{ id: 'a', price: 24.73 }], { round: 'charm_49' }).items[0]?.customerPrice,
+        ).toBe(24.49);
+    });
+
+    it('bulkUpdateFieldPerItem sets any field per item', () => {
+        const o = new Offer({
+            items: [
+                new OfferItem({ price: 10, id: 'a' }),
+                new OfferItem({ price: 20, id: 'b' }),
+                new OfferItem({ price: 30, id: 'c' }),
+            ],
+        });
+        const updated = o.bulkUpdateFieldPerItem('quantity', [
+            { id: 'a', value: 6 },
+            { id: 'c', value: 12 },
+        ]);
+        expect(updated.items.map(i => i.quantity)).toEqual([6, 1, 12]);
+    });
+
     it('an unknown strategy throws rather than silently pricing pours at zero', () => {
         const o = new Offer({ items: [new OfferItem({ price: 10, id: 'a' })] });
         expect(() =>

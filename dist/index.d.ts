@@ -246,11 +246,18 @@ interface PourStrategyInput {
     bottleVolume?: number;
     name?: string;
 }
-/** One explicit per-item pour price, for prices the caller computed itself. */
-interface PourPriceEntry {
+/** One explicit per-item value, for values the caller computed per line. */
+interface ItemValueEntry {
+    id: string;
+    value: any;
+}
+/** One explicit per-item price. */
+interface ItemPriceEntry {
     id: string;
     price: number;
 }
+/** A pour price is just a per-item price; kept as a name for existing callers. */
+type PourPriceEntry = ItemPriceEntry;
 interface OfferThumbnail {
     imgUrl?: string;
     title?: string;
@@ -479,6 +486,30 @@ declare class Offer {
      * glassPrice it rounds the glass price instead.
      */
     bulkUpdateField(ids: string[] | undefined, field: keyof ItemConfig, value: any, opts?: {
+        round?: RoundInput;
+    }): Offer;
+    /**
+     * Update one field with a DIFFERENT value per item, in a single call — the
+     * per-item counterpart of bulkUpdateField, whose `value` is one scalar
+     * broadcast to every id. Items absent from `values` are untouched.
+     *
+     * `opts.round` rounds each touched item's customer price right after the
+     * update (its glass price when the field is glassPrice), exactly as
+     * bulkUpdateField does.
+     */
+    bulkUpdateFieldPerItem(field: keyof ItemConfig, values: ItemValueEntry[], opts?: {
+        round?: RoundInput;
+    }): Offer;
+    /**
+     * Set an EXPLICIT guest price per item in one call — for prices derived
+     * per line rather than one number broadcast to many bottles (a list
+     * takeover matching each of the venue's own shelf prices, say).
+     *
+     * Setting customerPrice busts the stored margin/gross, so each item
+     * re-derives its own margin from its own cost — which is the point: N
+     * items end up on N different margins from one call.
+     */
+    setCustomerPricePerItem(prices: ItemPriceEntry[], opts?: {
         round?: RoundInput;
     }): Offer;
     setMargin(value: number, ids?: string[], opts?: {
@@ -818,4 +849,4 @@ declare function deriveUnpromptedChanges(view: NegotiationOfferView, opts?: {
     ignoreRequests?: boolean;
 }): UnpromptedChange[];
 
-export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_BOTTLE_ML, DEFAULT_OFFER_STATUS, DEFAULT_POUR_PREMIUM, DEFAULT_SORT, DERIVED_MODES, type DerivedMode, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, NEGOTIATION_PARTIES, type NegotiationAcceptance, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferOrigin, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, POUR_STRATEGIES, type PourPriceEntry, type PourStrategy, type PourStrategyInput, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, ROUNDING_PRESETS, type RequestKind, type RequestOutcome, type ResolvedRequest, type RoundInput, type RoundingPreset, type RoundingRule, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, applyRounding, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, resolveRounding, roundBaseline, sortItems, validateCategoryName };
+export { type BaselineLine, type CategoryNameValidation, type ChangeRequest, type ChangeRequestInput, type CustomCategory, DEFAULT_BOTTLE_ML, DEFAULT_OFFER_STATUS, DEFAULT_POUR_PREMIUM, DEFAULT_SORT, DERIVED_MODES, type DerivedMode, type FilterRule, type GroupedSection, type GroupingConfig, type GroupingMode, type ItemConfig, type ItemPriceEntry, type ItemValueEntry, NEGOTIATION_PARTIES, type NegotiationAcceptance, type NegotiationBaseline, type NegotiationLogLine, type NegotiationOfferView, type NegotiationParty, type NegotiationState, type NegotiationSummary, type NegotiationVersion, OFFER_STATUSES, OTHER_SECTION_VALUE, Offer, OfferItem, type OfferOrigin, type OfferRecipient, type OfferStatus, type OfferSummary, type OfferSummaryGroup, type OfferThumbnail, POUR_STRATEGIES, type PourPriceEntry, type PourStrategy, type PourStrategyInput, type PourVolume, REQUEST_KINDS, REQUEST_OUTCOMES, ROUNDING_PRESETS, type RequestKind, type RequestOutcome, type ResolvedRequest, type RoundInput, type RoundingPreset, type RoundingRule, STRATEGY_MISSING_VALUE, SUMMARY_GROUP_THUMBNAIL_LIMIT, SUMMARY_THUMBNAIL_LIMIT, type SavedStrategy, type SortConfig, type SortDirection, type SortField, type StrategyCategory, type UnpromptedChange, type UnpromptedChangeType, WINE_TYPE_KEYS, type WineTypeKey, applyRounding, buildBaseline, countOpenRequests, deriveUnpromptedChanges, detectWineType, groupItems, itemByLineId, latestBaseline, matchesRules, normalizeCustomGrouping, resolveRequest, resolveRequests, resolveRounding, roundBaseline, sortItems, validateCategoryName };

@@ -7,7 +7,7 @@ import {
     type OfferStatus,
 } from './constants.js';
 import { OfferItem } from './OfferItem.js';
-import type { ItemConfig, OfferTotals, PourVolume, PourStrategyInput, PourPriceEntry, OfferSummary, OfferSummaryGroup, OfferThumbnail } from './types.js';
+import type { ItemConfig, ItemPriceEntry, ItemValueEntry, OfferTotals, PourVolume, PourStrategyInput, PourPriceEntry, OfferSummary, OfferSummaryGroup, OfferThumbnail } from './types.js';
 import { round } from './utils/math.js';
 import type { RoundInput } from './utils/rounding.js';
 import { normalizeCustomGrouping, validateCategoryName } from './grouping/normalize.js';
@@ -223,6 +223,52 @@ export class Offer {
             return updated;
         });
         return new Offer({ ...this, items: newItems });
+    }
+
+    /**
+     * Update one field with a DIFFERENT value per item, in a single call — the
+     * per-item counterpart of bulkUpdateField, whose `value` is one scalar
+     * broadcast to every id. Items absent from `values` are untouched.
+     *
+     * `opts.round` rounds each touched item's customer price right after the
+     * update (its glass price when the field is glassPrice), exactly as
+     * bulkUpdateField does.
+     */
+    bulkUpdateFieldPerItem(
+        field: keyof ItemConfig,
+        values: ItemValueEntry[],
+        opts: { round?: RoundInput } = {},
+    ): Offer {
+        const valueById = new Map(values.map(entry => [entry.id, entry.value]));
+        const newItems = this.items.map(item => {
+            const value = valueById.get(item.id);
+            if (value === undefined) return item;
+            let updated = item.update({ [field]: value });
+            if (opts.round !== undefined && opts.round !== null) {
+                updated = field === 'glassPrice'
+                    ? updated.roundGlassPrice(opts.round)
+                    : updated.roundCustomerPrice(opts.round);
+            }
+            return updated;
+        });
+        return new Offer({ ...this, items: newItems });
+    }
+
+    /**
+     * Set an EXPLICIT guest price per item in one call — for prices derived
+     * per line rather than one number broadcast to many bottles (a list
+     * takeover matching each of the venue's own shelf prices, say).
+     *
+     * Setting customerPrice busts the stored margin/gross, so each item
+     * re-derives its own margin from its own cost — which is the point: N
+     * items end up on N different margins from one call.
+     */
+    setCustomerPricePerItem(prices: ItemPriceEntry[], opts: { round?: RoundInput } = {}): Offer {
+        return this.bulkUpdateFieldPerItem(
+            'customerPrice',
+            prices.map(entry => ({ id: entry.id, value: entry.price })),
+            opts,
+        );
     }
 
     setMargin(value: number, ids?: string[], opts: { round?: RoundInput } = {}): Offer {

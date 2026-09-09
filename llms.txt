@@ -19,6 +19,14 @@ The foundational unit representing a line item in an offer.
 ### Offer (`src/Offer.ts`)
 A collection of `OfferItem`s with aggregated totals.
 - **Bulk Operations**: `setMargin`, `setGross`, `setDiscount`, `setQuantity`, `setVatRate`, `setGlassPrice`, `setUnit`. Price-deriving setters (`setMargin/setGross/setDiscount/setVatRate/setGlassPrice/setPourVolume` and `bulkUpdateField`) accept a trailing `opts: { round?: RoundInput }` that rounds affected prices right after the mutation, e.g. `offer.setMargin(70, ids, { round: 'charm_49' })`.
+- **One value vs. a value per item.** `bulkUpdateField(ids, field, value, opts?)` broadcasts ONE
+  scalar to the `ids` subset (all items when `ids` is omitted) — every setter above is a thin
+  wrapper over it. `bulkUpdateFieldPerItem(field, values, opts?)` is the per-item counterpart:
+  `values` is an explicit `{ id, value }[]` and items absent from it are untouched, so N items
+  take N different values in ONE call. `setCustomerPricePerItem(prices, opts?)` is the guest-price
+  form (`{ id, price }[]`) — use it for prices derived per line rather than one number broadcast
+  to many bottles. Because setting `customerPrice` busts the stored margin, one such call leaves
+  N items on N margins, each derived from its own cost.
 - **Pour pricing in bulk**: `setPourVolumeByStrategy(input, ids?, opts?)` prices one pour size
   across many items from a single named strategy — like `setMargin`, the input is a *policy*, not
   a price, so each item derives its own pour price from its own state and N items yield N

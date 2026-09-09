@@ -34,11 +34,20 @@ export interface PourStrategyInput {
     name?: string;           // optional display label for the resulting pour
 }
 
-/** One explicit per-item pour price, for prices the caller computed itself. */
-export interface PourPriceEntry {
+/** One explicit per-item value, for values the caller computed per line. */
+export interface ItemValueEntry {
+    id: string;
+    value: any;
+}
+
+/** One explicit per-item price. */
+export interface ItemPriceEntry {
     id: string;
     price: number;
 }
+
+/** A pour price is just a per-item price; kept as a name for existing callers. */
+export type PourPriceEntry = ItemPriceEntry;
 
 export interface OfferThumbnail {
     imgUrl?: string;
