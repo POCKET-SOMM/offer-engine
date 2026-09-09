@@ -32,3 +32,13 @@ export const SUMMARY_THUMBNAIL_LIMIT = 8;
 // represented in a list row; each group also carries its true `count`, so a
 // consumer can render a "+N" tile beyond these.
 export const SUMMARY_GROUP_THUMBNAIL_LIMIT = 3;
+// How far a supplied `margin` may sit from the one the resolved gross implies
+// before the engine stops trusting it, in percentage points.
+//
+// A stored margin is kept verbatim so a round trip never drifts — re-deriving
+// it from an already-rounded customerPrice moves it slightly, measured at up to
+// 0.13pp across a sweep of prices, margins and VAT rates. Past this tolerance
+// the two are not the same number rounded differently, they are a genuine
+// contradiction (a 110 guest price labelled 70% when the wine cost makes it
+// 50%), and the documented hierarchy applies: the price wins.
+export const MARGIN_RECONCILE_TOLERANCE = 0.5;

@@ -389,9 +389,41 @@ describe('OfferItem', () => {
             expect(item.margin).not.toBe(70);
         });
 
-        it('keeps an explicit margin override next to a pinned price', () => {
+        it('reconciles an explicit margin override against a pinned price', () => {
+            // Both pinned: the price wins, per the documented hierarchy. Keeping
+            // the 65 would leave the item contradicting its own gross.
             const item = OfferItem.fromWine({ id: 'w', price: 8 }, { customerPrice: 34, margin: 65 });
-            expect(item.margin).toBe(65);
+            const priceBeforeVat = 34 / (1 + 25.5 / 100);
+            expect(item.margin).toBeCloseTo((item.gross / priceBeforeVat) * 100, 1);
+            expect(item.margin).not.toBe(65);
+        });
+
+        it('never reports a margin its own gross contradicts', () => {
+            // The reported bug: a 110 guest price labelled 70% while the wine's
+            // cost makes it ~50%.
+            const item = new OfferItem({ id: 'x', price: 43.82, customerPrice: 110, margin: 70, vatRate: 25.5 });
+            expect(item.customerPrice).toBe(110);
+            expect(item.margin).toBeCloseTo(50.01, 1);
+            expect(item.margin).toBeCloseTo((item.gross / (110 / 1.255)) * 100, 1);
+        });
+
+        it('heals a stored contradiction on the next load', () => {
+            const bad = new OfferItem({ id: 'x', price: 43.82, customerPrice: 110, margin: 70, vatRate: 25.5 });
+            expect(new OfferItem(bad.toConfig()).margin).toBe(bad.margin);
+        });
+
+        it('keeps a stored margin verbatim when it only drifts', () => {
+            // Re-deriving from an already-rounded customerPrice moves the margin
+            // a little; that must not be mistaken for a contradiction.
+            const original = new OfferItem({ id: 'a', price: 2.5, margin: 20, vatRate: 0 });
+            const reloaded = new OfferItem(original.toConfig());
+            expect(reloaded.margin).toBe(20);
+        });
+
+        it('reconciles a margin that contradicts a supplied gross', () => {
+            const item = new OfferItem({ id: 'g', price: 10, gross: 30, margin: 70, vatRate: 0 });
+            expect(item.gross).toBe(30);
+            expect(item.margin).toBeCloseTo(75, 1);
         });
 
         it('should create an OfferItem from a basic wine object', () => {

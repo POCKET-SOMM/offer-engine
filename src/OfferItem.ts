@@ -1,7 +1,25 @@
 import { round } from './utils/math.js';
 import { applyRounding, type RoundInput } from './utils/rounding.js';
-import { UNIT_MULTIPLIERS, DEFAULT_BOTTLE_ML, DEFAULT_POUR_PREMIUM } from './constants.js';
+import { UNIT_MULTIPLIERS, DEFAULT_BOTTLE_ML, DEFAULT_POUR_PREMIUM, MARGIN_RECONCILE_TOLERANCE } from './constants.js';
 import type { ItemConfig, PourVolume, PourStrategyInput } from './types.js';
+
+/**
+ * The margin to store, given one supplied on the config and the gross the
+ * higher-priority fields resolved to.
+ *
+ * `margin` is never independent once `gross` is known — it is exactly
+ * `gross / priceBeforeVat`. Trusting a supplied margin verbatim keeps a stored
+ * one from drifting on a round trip, but when it contradicts the resolved gross
+ * it produces an item at odds with itself: a guest price of 110 reporting 70%
+ * while its own gross says 50%. Past MARGIN_RECONCILE_TOLERANCE the documented
+ * hierarchy decides (customerPrice > gross > margin) and the margin is
+ * re-derived, so a stored contradiction also heals the next time it loads.
+ */
+function reconcileMargin(supplied: number | undefined, gross: number, priceBeforeVat: number): number {
+    const derived = priceBeforeVat === 0 ? 0 : round((gross / priceBeforeVat) * 100);
+    if (supplied === undefined) return derived;
+    return Math.abs(supplied - derived) <= MARGIN_RECONCILE_TOLERANCE ? supplied : derived;
+}
 
 export class OfferItem {
     public readonly id: string;
@@ -82,19 +100,19 @@ export class OfferItem {
                 this.gross = config.gross;
                 const priceBeforeVat = this.pricePerBottle + this.gross;
                 this.vatAmount = round(this.customerPrice - priceBeforeVat);
-                this.margin = config.margin !== undefined ? config.margin : round((this.gross / priceBeforeVat) * 100);
+                this.margin = reconcileMargin(config.margin, this.gross, priceBeforeVat);
             } else {
                 const priceBeforeVat = this.customerPrice / (1 + this.vatRate / 100);
                 this.vatAmount = round(this.customerPrice - priceBeforeVat);
                 this.gross = round(priceBeforeVat - this.pricePerBottle);
-                this.margin = config.margin !== undefined ? config.margin : round((this.gross / priceBeforeVat) * 100);
+                this.margin = reconcileMargin(config.margin, this.gross, priceBeforeVat);
             }
         } else if (config.gross !== undefined) {
             this.gross = config.gross;
             const priceBeforeVat = this.pricePerBottle + this.gross;
             this.vatAmount = round(priceBeforeVat * (this.vatRate / 100));
             this.customerPrice = round(priceBeforeVat + this.vatAmount);
-            this.margin = config.margin !== undefined ? config.margin : round((this.gross / priceBeforeVat) * 100);
+            this.margin = reconcileMargin(config.margin, this.gross, priceBeforeVat);
         } else {
             this.margin = round(config.margin || 0);
             const marginMultiplier = 1 - this.margin / 100;

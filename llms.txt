@@ -215,6 +215,16 @@ display `log`, and a compact `baseline` of the lines as transmitted), and the li
 
 ### Convention: `OfferItem.fromWine` overrides that pin a price
 `fromWine(wine, overrides)` defaults `margin` to 70 only when the overrides do not pin the line's
-price: a `customerPrice` or `gross` override makes the constructor derive the margin from that pin
-(an explicit `margin` override still wins). Before v1.15.1 the default margin survived next to a
-pinned price and the item reported 70% at any guest price.
+price: a `customerPrice` or `gross` override makes the constructor derive the margin from that pin.
+Before v1.15.1 the default margin survived next to a pinned price and the item reported 70% at any
+guest price.
+
+**A margin is never independent of the resolved gross.** When a config supplies `margin` alongside
+`customerPrice` or `gross`, the constructor keeps it verbatim only while it agrees with the margin
+that gross implies (`MARGIN_RECONCILE_TOLERANCE`, 0.5pp — enough to absorb the drift from
+re-deriving off an already-rounded `customerPrice`, measured at up to 0.13pp). Past that the two are
+a contradiction rather than the same number rounded differently, and the documented hierarchy
+decides: the price wins and the margin is re-derived. Before v1.17.1 an explicit `margin` was
+trusted unconditionally, so `{ customerPrice: 110, margin: 70 }` produced an item reporting 70%
+whose own `gross` said 50% — and it survived every round trip. Stored items in that state now heal
+the next time they load.
