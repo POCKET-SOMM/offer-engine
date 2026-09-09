@@ -50,6 +50,37 @@ Direction: `'asc' | 'desc'`. `DEFAULT_SORT` is `{ field: 'price', dir: 'asc' }`.
 deliberate no-op (returns the items in their existing order) so a stale persisted sort can never
 throw or drop items.
 
+### Grouping (`src/grouping/`, stored at `offer.data.grouping`)
+The sections a list prints under. Presentational only — it never touches items or
+prices. `groupItems(items, grouping, { savedStrategies })` is pure; `offer.setGrouping(config)`
+persists it on the data bag, so an offer's structure survives a round-trip.
+
+`GroupingConfig` is `{ mode, strategyId?, customCategories? }` with `mode` one of:
+- **Derived** (`DERIVED_MODES`): `type` (sparkling/white/rose/orange/red/fortified/dessert,
+  by `detectWineType`), `country`, `region`, `producer`, `grape`. These read the wine itself,
+  so sections stay correct as items come and go. `type` yields translatable keys; the rest
+  yield the stored value as the section key (`'Rhône Valley'`, `'Domaine Rolet'`) — consumers
+  render those verbatim. `region` is the broad region, NOT the narrower `regions` trail
+  (sectioning by appellation gives one wine per section). `grape` files a blend under the
+  first entry of `grapes`, which is stored dominant-first — a wine belongs to exactly one
+  section. Order: `type` uses `WINE_TYPE_KEYS`; the others biggest section first, then
+  alphabetical.
+- **`custom`** — a snapshot: `customCategories: [{ id, name, itemIds }]` in print order, names
+  shown verbatim. Use it for anything the derived modes don't express. Items added later are
+  NOT reclassified — they fall to `Other` until regrouped. `addCustomCategory`, `renameCustomCategory`,
+  `removeCustomCategory`, `reorderCustomCategories`, `moveItemToCategory` and `enterCustomMode`
+  all switch the offer into this mode; `normalizeCustomGrouping()` drops ids that no longer
+  reference live items (a no-op in every other mode).
+- **`strategy`** — `strategyId` into `options.savedStrategies`, whose categories carry
+  `matchesRules` filters. The definitions live in the CONSUMER app, so an offer alone cannot
+  resolve one (see `toSummary` below).
+
+Every mode appends a synthetic `Other` section (`OTHER_SECTION_VALUE`, `isOther: true`) for
+items it could not place, always last; empty sections are omitted except in `custom` mode,
+where a category you named is kept even while empty. `validateCategoryName(name, existing, reserved)`
+guards custom names (empty / duplicate / reserved — the consumer supplies its translations of
+"Other").
+
 ### Menus (`offer.menus`)
 An offer holds **`menus: readonly any[]`** — opaque menu objects the engine never inspects (pairing
 logic lives in the consumer app). Mutate immutably with `setMenus(menus)`, `addMenu(menu)`,
@@ -76,8 +107,9 @@ fields the engine doesn't model — so a feature can be added **without** wideni
 - `groups` — the same wines grouped **the way the offer itself is grouped**:
   `{ value, label?, count, thumbnails }[]`. Each group is capped at 3 thumbnails
   (`SUMMARY_GROUP_THUMBNAIL_LIMIT`) while `count` reports the group's **true** size, so a list row can
-  render a "+N" tile. `label` is set only for custom categories; built-in `type`/`country` groups
-  expose a `value` key the consumer localizes itself. Empty groups are omitted.
+  render a "+N" tile. `label` is set only for custom categories; a derived mode exposes its `value`
+  key instead — the consumer localizes it for `type`, and renders it as-is for the rest (they are
+  wine data, not tokens). Empty groups are omitted.
 - `groupingMode` — the mode `groups` was built with.
 - `wineCount`, `status`.
 - `menuTitles` — titles of all attached menus in order (`null` for an untitled menu); `[]` when none.
@@ -87,7 +119,7 @@ Item order (flat and within groups) follows the offer's saved `sort`, or inserti
 **Strategy grouping is previewed as `type`.** A saved strategy's definition (categories + filter
 rules) lives in the *consumer app*, not on the offer — `groupItems` needs it passed in via
 `options.savedStrategies`, which `toSummary()` has no access to. Manual (`custom`) grouping is fully
-self-contained on `offer.data.grouping` and IS honoured, as are `type`/`country`.
+self-contained on `offer.data.grouping` and IS honoured, as is every derived mode.
 
 `toJSON()` embeds the summary as `summary`, a **top-level sibling of `items`/`totals`** (not nested
 under `data`). Because it's part of `toJSON()`, it's recomputed on every serialization and can't

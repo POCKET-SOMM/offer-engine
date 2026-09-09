@@ -1,6 +1,14 @@
 import type { OfferItem } from '../OfferItem.js';
 
-export type GroupingMode = 'type' | 'country' | 'strategy' | 'custom';
+/**
+ * Derived modes bucket items by a field on the wine itself, so the sections
+ * stay correct as items come and go. `custom` is the opposite: a snapshot of
+ * ids that only changes when someone regroups.
+ */
+export const DERIVED_MODES = ['type', 'country', 'region', 'producer', 'grape'] as const;
+export type DerivedMode = typeof DERIVED_MODES[number];
+
+export type GroupingMode = DerivedMode | 'strategy' | 'custom';
 
 export interface FilterRule {
     type: string;

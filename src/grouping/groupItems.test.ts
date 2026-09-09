@@ -62,6 +62,81 @@ describe('groupItems — country mode', () => {
     });
 });
 
+describe('groupItems — region / producer / grape modes', () => {
+    // Shapes as the catalogue actually stores them: a broad `region` next to a
+    // narrower `regions` trail, and `grapes` dominant-first.
+    const rhone = item('a', {
+        region: 'Rhône Valley',
+        regions: ['Rhône', 'Châteauneuf-du-Pape'],
+        producer: 'Domaine Giraud',
+        grapes: ['Syrah', 'Garnacha Tinta', 'Monastrell'],
+    });
+    const rhone2 = item('b', {
+        region: 'Rhône Valley',
+        regions: ['Rhône', 'Crozes-Hermitage'],
+        producer: 'Domaine Delhome',
+        grapes: ['Marsanne'],
+    });
+    const alsace = item('c', {
+        region: 'Alsace',
+        producer: 'Domaine Marcel Deiss',
+        grapes: ['Riesling', 'Gewurztraminer'],
+    });
+    const bare = item('d', {});
+
+    it('groups by the broad region, not the appellation trail', () => {
+        const sections = groupItems([rhone, rhone2, alsace, bare], { mode: 'region' });
+        expect(sections.map((s) => s.value)).toEqual([
+            'Rhône Valley',
+            'Alsace',
+            OTHER_SECTION_VALUE,
+        ]);
+        expect(sections[0]?.items.length).toBe(2);
+    });
+
+    it('groups by producer', () => {
+        const sections = groupItems([rhone, rhone2, alsace], { mode: 'producer' });
+        // One wine each, so purely alphabetical.
+        expect(sections.map((s) => s.value)).toEqual([
+            'Domaine Delhome',
+            'Domaine Giraud',
+            'Domaine Marcel Deiss',
+        ]);
+    });
+
+    it('files a blend under its dominant grape', () => {
+        const sections = groupItems([rhone, rhone2, alsace, bare], { mode: 'grape' });
+        expect(sections.map((s) => s.value)).toEqual([
+            'Marsanne',
+            'Riesling',
+            'Syrah',
+            OTHER_SECTION_VALUE,
+        ]);
+    });
+
+    it('accepts a bare grape string and skips blank entries', () => {
+        const single = item('e', { grapes: 'Nebbiolo' });
+        const padded = item('f', { grapes: ['', '  ', 'Nebbiolo'] });
+        const sections = groupItems([single, padded], { mode: 'grape' });
+        expect(sections.map((s) => s.value)).toEqual(['Nebbiolo']);
+        expect(sections[0]?.items.length).toBe(2);
+    });
+
+    it('treats a blank or non-string value as ungrouped', () => {
+        const blank = item('g', { region: '   ' });
+        const numeric = item('h', { producer: 42 });
+        expect(groupItems([blank], { mode: 'region' })[0]?.value).toBe(OTHER_SECTION_VALUE);
+        expect(groupItems([numeric], { mode: 'producer' })[0]?.value).toBe(OTHER_SECTION_VALUE);
+    });
+
+    it('trims stored whitespace so one region is one section', () => {
+        const padded = item('i', { region: ' Alsace ' });
+        const sections = groupItems([padded, alsace], { mode: 'region' });
+        expect(sections.map((s) => s.value)).toEqual(['Alsace']);
+        expect(sections[0]?.items.length).toBe(2);
+    });
+});
+
 describe('groupItems — strategy mode', () => {
     const strategies: SavedStrategy[] = [
         {

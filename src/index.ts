@@ -27,11 +27,13 @@ export { detectWineType } from './grouping/wineType.js';
 export { normalizeCustomGrouping, validateCategoryName } from './grouping/normalize.js';
 export {
     WINE_TYPE_KEYS,
+    DERIVED_MODES,
     OTHER_SECTION_VALUE,
     STRATEGY_MISSING_VALUE,
 } from './grouping/types.js';
 export type {
     GroupingMode,
+    DerivedMode,
     GroupingConfig,
     FilterRule,
     CustomCategory,

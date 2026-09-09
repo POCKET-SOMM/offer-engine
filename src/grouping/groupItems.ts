@@ -43,19 +43,30 @@ function groupByType(items: readonly OfferItem[]): GroupedSection[] {
     return sections;
 }
 
-function groupByCountry(items: readonly OfferItem[]): GroupedSection[] {
+/**
+ * Bucket items by a value read off the wine, biggest section first then
+ * alphabetical. Items with no value land in Other.
+ *
+ * The section key IS the stored value ('Rhône Valley', 'Domaine Rolet'), not a
+ * translatable token — consumers render these verbatim, unlike the `type`
+ * buckets. Wine data is already stored title-cased, so no casing is applied.
+ */
+function groupByValue(
+    items: readonly OfferItem[],
+    readKey: (item: OfferItem) => string | null
+): GroupedSection[] {
     const buckets = new Map<string, OfferItem[]>();
     const other: OfferItem[] = [];
 
     for (const item of items) {
-        const country = item.data?.['country'];
-        if (typeof country !== 'string' || country.trim() === '') {
+        const key = readKey(item);
+        if (key === null) {
             other.push(item);
             continue;
         }
-        const list = buckets.get(country) ?? [];
+        const list = buckets.get(key) ?? [];
         list.push(item);
-        buckets.set(country, list);
+        buckets.set(key, list);
     }
 
     const sections: GroupedSection[] = Array.from(buckets.entries())
@@ -67,6 +78,30 @@ function groupByCountry(items: readonly OfferItem[]): GroupedSection[] {
 
     if (other.length > 0) sections.push(buildOtherSection(other));
     return sections;
+}
+
+/** A non-empty string field on the wine, else null. */
+function stringField(item: OfferItem, field: string): string | null {
+    const value = item.data?.[field];
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * The wine's principal grape. `grapes` is stored dominant-first, so a blend
+ * files under the grape that leads it — a "by grape" list sections by the
+ * varietal a wine is sold as, not by every grape in the blend (a wine belongs
+ * to exactly one section). Accepts a bare string for single-grape records.
+ */
+function primaryGrape(item: OfferItem): string | null {
+    const grapes = item.data?.['grapes'];
+    if (typeof grapes === 'string') return stringField(item, 'grapes');
+    if (!Array.isArray(grapes)) return null;
+    for (const grape of grapes) {
+        if (typeof grape === 'string' && grape.trim() !== '') return grape.trim();
+    }
+    return null;
 }
 
 function groupByStrategy(
@@ -143,7 +178,16 @@ export function groupItems(
         case 'type':
             return groupByType(items);
         case 'country':
-            return groupByCountry(items);
+            return groupByValue(items, (item) => stringField(item, 'country'));
+        case 'region':
+            // The broad region ('Rhône Valley'), not the appellation trail in
+            // `regions` — sectioning a list by appellation gives one wine per
+            // section, which is not a list structure anyone prints.
+            return groupByValue(items, (item) => stringField(item, 'region'));
+        case 'producer':
+            return groupByValue(items, (item) => stringField(item, 'producer'));
+        case 'grape':
+            return groupByValue(items, primaryGrape);
         case 'strategy':
             return groupByStrategy(items, grouping.strategyId, options.savedStrategies ?? []);
         case 'custom':
